@@ -24,7 +24,8 @@ const Navbar = () => {
         const lng = 29.9187;
 
         const response = await fetch(
-          `https://zawawy-api-staging.onrender.com/v1/prayer-times?latitude=${lat}&longitude=${lng}`
+          // `https://zawawy-api-staging.onrender.com/v1/prayer-times?latitude=${lat}&longitude=${lng}`
+          `/v1/prayer-times?latitude=31.2001&longitude=29.9187`
         );
 
         if (response.ok) {
