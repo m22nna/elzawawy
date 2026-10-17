@@ -1,5 +1,10 @@
+
+
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/v1/:path*",
+      "destination": "https://zawawy-api-staging.onrender.com/v1/:path*"
+    }
   ]
 }
