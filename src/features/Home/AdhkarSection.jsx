@@ -9,6 +9,8 @@ import { api } from "../../api/client";
 import { usePrayerTimes } from "../../api/usePrayerTimes";
 import { useKhatmDua } from "../../api/useKhatmDua";
 import { markDone } from "./wirdStore";
+import Navbar from "../../components/NavBar";
+import { Link } from "react-router-dom";
 
 
 
@@ -862,64 +864,8 @@ const ICON_TONE = {
 
 const WAVE = [6, 12, 8, 16, 10, 18, 7, 14, 9, 17, 6, 13, 8, 15, 10, 12, 7, 11];
 
-function HomeHeader({ prayer, onNavigate }) {
-  const d = new Date();
-  const weekday = new Intl.DateTimeFormat("ar-EG", { weekday: "long" }).format(d);
-  const hijri = new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura", { day: "numeric", month: "long", year: "numeric" }).format(d);
-  const next = prayer?.next;
-
-  return (
-    <header className="bg-[#F7FCF9] border-b border-[#DCEAE2]">
-      <Wrap className="flex flex-wrap items-center gap-5 py-5 lg:flex-nowrap">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => onNavigate && onNavigate("home")}>
-          <img src="/logo.png" alt="الشيخ عبدالرحمن الزواوي" className="h-14 w-14 object-contain" />
-          <p className="text-xs font-bold leading-5 text-[#063F30]">الشيخ<br />عبدالرحمن<br />الزواوي</p>
-        </div>
-
-        <nav className="hidden flex-1 items-center gap-1 lg:flex" aria-label="القائمة الرئيسية">
-          {NAV.map((x) => {
-            const isActive = x === "الأذكار";
-            return (
-              <button
-                key={x}
-                onClick={() => {
-                  if (x === "الأذكار" && onNavigate) onNavigate("adhkar");
-                  if (x === "الرئيسية" && onNavigate) onNavigate("home");
-                }}
-                className={`whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-semibold transition ${
-                  isActive ? "bg-[#063F30] text-white shadow-md" : "text-[#063F30]/80 hover:bg-[#E3EEE8]"
-                }`}
-              >
-                {x}
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="flex items-center gap-3 rounded-full border border-[#DCEAE2] bg-white px-4 py-2">
-          <Sun className="text-[#C69234]" size={16} />
-          <p className="text-[10px] font-bold leading-4 text-[#063F30]">{weekday}<br />{hijri}</p>
-          <p className="text-[10px] font-bold leading-4 text-[#063F30]">
-            {next?.name ?? "العصر"}:<br />{next ? to12h(next.iso.slice(11, 16)) : "03:24 م"}
-          </p>
-        </div>
-
-        <label className="flex min-w-[260px] items-center gap-2 rounded-full border border-[#DCEAE2] bg-white px-4 py-3">
-          <Search className="text-[#063F30]/60" size={14} />
-          <input
-            className="w-full bg-transparent text-xs outline-none placeholder:text-[#063F30]/50"
-            placeholder="ابحث عن سورة، آية، حديث، أو فتوى..."
-          />
-        </label>
-
-        {[Bell, Bookmark].map((Icon, k) => (
-          <button key={k} aria-label="أيقونة" className="grid h-10 w-10 place-items-center rounded-full border border-[#DCEAE2] bg-white text-[#063F30]">
-            <Icon size={16} />
-          </button>
-        ))}
-      </Wrap>
-    </header>
-  );
+function HomeHeader() {
+  return <Navbar />;
 }
 
 export default function AdhkarSection({ onNavigate }) {
@@ -1082,7 +1028,7 @@ export default function AdhkarSection({ onNavigate }) {
 
       <Wrap className="pb-2 pt-6">
         <div className="mb-3 flex items-center gap-1.5 text-xs text-[#063F30]/60">
-          <span className="cursor-pointer hover:underline" onClick={() => onNavigate && onNavigate("home")}>الرئيسية</span>
+          <Link to="/" className="cursor-pointer hover:underline">الرئيسية</Link>
           <ChevronLeft size={12} />
           <span className="font-bold text-[#063F30]">الأذكار والأدعية</span>
         </div>
