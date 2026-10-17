@@ -47,7 +47,8 @@ const Hero = ({ bgImageUrl }) => {
         const lng = 29.9187;
 
         const res = await fetch(
-          `https://zawawy-api-staging.onrender.com/v1/prayer-times?latitude=${lat}&longitude=${lng}`
+          // `https://zawawy-api-staging.onrender.com/v1/prayer-times?latitude=${lat}&longitude=${lng}`
+          `/v1/prayer-times?latitude=${lat}&longitude=${lng}`
         );
 
         if (res.ok) {
