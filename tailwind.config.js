@@ -57,8 +57,20 @@ export default {
         cream: "#FAF9F6",
         muted: "#68736F",
 
+        wird: {
+          green: "#003325",
+          gold: "#C69234",
+          "gold-dark": "#785A19",
+          mist: "#E6EFE9",
+          card: "#FFFFFFF2",
+          "gold-soft": "#FDD48766",
+        },
+
 
       },
+
+      
+        
       fontFamily: {
         body: ['"Cairo"', "system-ui", "sans-serif"],
         display: ['"Cairo"', '"Amiri"', "serif"],

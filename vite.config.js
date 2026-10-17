@@ -6,9 +6,9 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 5173,
+    proxy: {
+      "/v1": { target: "https://zawawy-api-staging.onrender.com", changeOrigin: true },
+    },
   },
-  preview: {
-    host: "0.0.0.0",
-    port: 4173,
-  },
+  preview: { host: "0.0.0.0", port: 4173 },
 });
