@@ -13,7 +13,7 @@ export default function Waveform({ seed = 1, progress = 0, bars = 36 }) {
         <span
           key={i}
           style={{ height: `${h}%` }}
-          className={`w-[3px] rounded-full ${
+          className={`w-[4px] rounded-full ${
             i === playhead && progress > 0
               ? "bg-wird-gold"
               : i < playhead

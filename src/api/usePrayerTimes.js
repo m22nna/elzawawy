@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useState } from "react";
 import { api } from "./client";
 
@@ -64,8 +63,12 @@ export function usePrayerTimes() {
       const t = days.find((x) => x.date === ymd(tomorrow));
       if (t) next = { key: "fajr", name: "الفجر", iso: t.timings.fajr };
     }
-    if (!next) return { rows, next: null, countdown: "-- : -- : --" };
+    const passed = rows.filter((r) => r.key !== "sunrise" && new Date(r.iso).getTime() <= now);
+    const currentKey = passed.length ? passed[passed.length - 1].key : "isha";
+    const hijri = todayRow.hijri;
 
-    return { rows, next, countdown: hms(new Date(next.iso).getTime() - now) };
+    if (!next) return { rows, next: null, currentKey, hijri, countdown: "-- : -- : --" };
+
+    return { rows, next, currentKey, hijri, countdown: hms(new Date(next.iso).getTime() - now) };
   }, [days, now]);
 }
