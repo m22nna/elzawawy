@@ -1,10 +1,8 @@
 
-
 {
   "rewrites": [
-    {
-      "source": "/v1/:path*",
-      "destination": "https://zawawy-api-staging.onrender.com/v1/:path*"
-    }
+    { "source": "/v1/:path*", "destination": "https://zawawy-api-staging.onrender.com/v1/:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
+
