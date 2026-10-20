@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Search,
@@ -6,57 +6,20 @@ import {
   Bookmark,
   Sun,
 } from 'lucide-react';
+import { usePrayerTimes } from '../api/usePrayerTimes';
 
 const Navbar = () => {
   const location = useLocation();
   const isHome = location.pathname === '/' || location.pathname === '/home';
   const isAdhkar = location.pathname.startsWith('/adhkar') || location.pathname.startsWith('/azkar');
 
-  const [prayerData, setPrayerData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const prayer = usePrayerTimes(); // null لحد ما البيانات توصل
   const [searchQuery, setSearchQuery] = useState('');
 
-  // جلب مواقيت الصلاة والتاريخ الهجري
-  useEffect(() => {
-    const fetchPrayerTimes = async () => {
-      try {
-        const lat = 31.2001;
-        const lng = 29.9187;
-
-        const response = await fetch(
-          // `https://zawawy-api-staging.onrender.com/v1/prayer-times?latitude=${lat}&longitude=${lng}`
-          `/v1/prayer-times?latitude=31.2001&longitude=29.9187`
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-
-          if (data.days && data.days.length > 0) {
-            setPrayerData(data.days[0]);
-          }
-        }
-      } catch (error) {
-        console.error('خطأ في جلب مواقيت الصلاة:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPrayerTimes();
-  }, []);
-
-  // تنسيق الوقت
   const formatTime = (isoString) => {
     if (!isoString) return '--:--';
-
-    const date = new Date(isoString);
-    let hours = date.getHours();
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    const ampm = hours >= 12 ? 'م' : 'ص';
-
-    hours = hours % 12 || 12;
-
-    return `${hours.toString().padStart(2, '0')}:${minutes} ${ampm}`;
+    const [h, m] = isoString.slice(11, 16).split(':').map(Number);
+    return `${String(h % 12 || 12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${h < 12 ? 'ص' : 'م'}`;
   };
 
   return (
@@ -89,15 +52,14 @@ const Navbar = () => {
 
             {/* اسم الشيخ */}
             <div className="text-right">
-              <h1 className="text-lg sm:text-xl 2xl:text-2xl font-extrabold tracking-tight text-[#1a382b] flex items-center gap-1.5 whitespace-nowrap">
-                <span>الشيخ</span>
-                <span className="text-[#15803d]">عبدالرحمن</span>
-                <span>الزواوي</span>
-              </h1>
+        <h1 className="font-display text-xs sm:text-sm font-extrabold leading-[1.35] text-wird-green text-right">    الشيخ
+                 <br />
+               عبدالرحمن
+               <br />
+            الزواوي
+        </h1>
 
-              <p className="text-[10px] sm:text-[11px] text-gray-500 font-medium mt-0.5">
-                موقع القارئ الرسمي
-              </p>
+          
             </div>
           </Link>
 
@@ -161,28 +123,24 @@ const Navbar = () => {
             <div className="flex items-center justify-center bg-[#e2ece9] text-[#1b4332] px-3 py-2 rounded-full text-xs font-medium border border-[#c3ded6] shadow-sm max-w-full shrink-0">
               <Sun className="w-4 h-4 text-[#d97706] ml-2 shrink-0" />
 
-              {loading ? (
+              {!prayer ? (
                 <span className="animate-pulse whitespace-nowrap">
                   جاري التحميل...
                 </span>
-              ) : prayerData ? (
+              ) : (
                 <div className="flex items-center gap-2 whitespace-nowrap">
                   <span>
-                    {prayerData.hijri?.day}{' '}
-                    {prayerData.hijri?.monthNameArabic}{' '}
-                    {prayerData.hijri?.year} هـ
+                    {prayer.hijri?.day}{' '}
+                    {prayer.hijri?.monthNameArabic}{' '}
+                    {prayer.hijri?.year} هـ
                   </span>
 
                   <span className="text-[#a3b18a]">•</span>
 
                   <span className="font-bold">
-                    العصر: {formatTime(prayerData.timings?.asr)}
+                    {prayer.next?.name}: {formatTime(prayer.next?.iso)}
                   </span>
                 </div>
-              ) : (
-                <span className="whitespace-nowrap">
-                  مواقيت الصلاة غير متاحة
-                </span>
               )}
             </div>
 

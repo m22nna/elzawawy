@@ -6,6 +6,17 @@ import {
   BookOpen,
   Clock
 } from 'lucide-react';
+import { usePrayerTimes } from '../api/usePrayerTimes';
+
+
+const PRAYER_ROWS = [
+  ['fajr', 'الفجر'],
+  ['sunrise', 'الشروق'],
+  ['dhuhr', 'الظهر'],
+  ['asr', 'العصر'],
+  ['maghrib', 'المغرب'],
+  ['isha', 'العشاء'],
+];
 
 const cleanBgImage = (url) => {
   const fallback = '/images/hero-bg.jpeg';
@@ -30,43 +41,16 @@ const cleanBgImage = (url) => {
 };
 
 const Hero = ({ bgImageUrl }) => {
-  // مواقيت الصلاة
-  const [prayerTimes, setPrayerTimes] = useState(null);
-  const [loadingPrayers, setLoadingPrayers] = useState(true);
+  const prayer = usePrayerTimes();
+  const loadingPrayers = !prayer;
+  const prayerTimes = prayer
+    ? Object.fromEntries(prayer.rows.map((r) => [r.key, r.iso]))
+    : null;
 
   // مشغل التلاوة
   const [recitation, setRecitation] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef(null);
-
-  // جلب مواقيت الصلاة - الإسكندرية
-  useEffect(() => {
-    const fetchPrayerTimes = async () => {
-      try {
-        const lat = 31.2001;
-        const lng = 29.9187;
-
-        const res = await fetch(
-          // `https://zawawy-api-staging.onrender.com/v1/prayer-times?latitude=${lat}&longitude=${lng}`
-          `/v1/prayer-times?latitude=${lat}&longitude=${lng}`
-        );
-
-        if (res.ok) {
-          const data = await res.json();
-
-          if (data.days && data.days.length > 0) {
-            setPrayerTimes(data.days[0].timings);
-          }
-        }
-      } catch (err) {
-        console.error('خطأ في جلب مواقيت الصلاة:', err);
-      } finally {
-        setLoadingPrayers(false);
-      }
-    };
-
-    fetchPrayerTimes();
-  }, []);
 
   // جلب تلاوة سورة الكهف
   useEffect(() => {
@@ -120,15 +104,10 @@ const Hero = ({ bgImageUrl }) => {
   const formatTime = (isoStr) => {
     if (!isoStr) return '--:--';
 
-    const date = new Date(isoStr);
+   
+    const [h, m] = isoStr.slice(11, 16).split(':').map(Number);
 
-    let hours = date.getHours();
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    const ampm = hours >= 12 ? 'م' : 'ص';
-
-    hours = hours % 12 || 12;
-
-    return `${hours.toString().padStart(2, '0')}:${minutes} ${ampm}`;
+    return `${String(h % 12 || 12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${h < 12 ? 'ص' : 'م'}`;
   };
 
   const currentBg = cleanBgImage(bgImageUrl);
@@ -146,7 +125,6 @@ const Hero = ({ bgImageUrl }) => {
           className="w-full h-full object-cover object-left md:object-center pointer-events-none"
         />
 
-        {/* تدرج خفيف للموبايل */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#071e17]/95 via-[#071e17]/40 to-transparent lg:hidden pointer-events-none" />
       </div>
 
@@ -159,7 +137,7 @@ const Hero = ({ bgImageUrl }) => {
           {/* النصوص والأزرار */}
           <div className="max-w-xl space-y-5 text-right">
 
-            {/* الشارة */}
+
             <div className="inline-flex items-center gap-2 bg-[#0e2c22]/90 border border-[#1e523f] px-3.5 py-1.5 rounded-full text-xs text-[#86efac] shadow-sm backdrop-blur-md">
               <BookOpen className="w-3.5 h-3.5 text-[#86efac] shrink-0" />
               <span className="font-medium">
@@ -220,65 +198,26 @@ const Hero = ({ bgImageUrl }) => {
                 </span>
               </div>
 
-              {/* الفجر */}
-              <div className="flex justify-between items-center py-1 px-1.5 font-medium">
-                <span className="text-gray-300">الفجر</span>
-                <span className="text-white font-semibold">
-                  {loadingPrayers
-                    ? '04:22 ص'
-                    : formatTime(prayerTimes?.fajr)}
-                </span>
-              </div>
-
-              {/* الشروق */}
-              <div className="flex justify-between items-center py-1 px-1.5 font-medium">
-                <span className="text-gray-300">الشروق</span>
-                <span className="text-white font-semibold">
-                  {loadingPrayers
-                    ? '05:50 ص'
-                    : formatTime(prayerTimes?.sunrise)}
-                </span>
-              </div>
-
-              {/* الظهر */}
-              <div className="flex justify-between items-center py-1 px-1.5 font-medium">
-                <span className="text-gray-300">الظهر</span>
-                <span className="text-white font-semibold">
-                  {loadingPrayers
-                    ? '11:58 ص'
-                    : formatTime(prayerTimes?.dhuhr)}
-                </span>
-              </div>
-
-              {/* العصر */}
-              <div className="flex justify-between items-center bg-[#b8860b]/35 border border-[#c69234]/50 text-[#fef08a] px-3 py-1.5 rounded-lg font-bold shadow-sm">
-                <span>• العصر (الآن)</span>
-                <span>
-                  {loadingPrayers
-                    ? '03:24 م'
-                    : formatTime(prayerTimes?.asr)}
-                </span>
-              </div>
-
-              {/* المغرب */}
-              <div className="flex justify-between items-center py-1 px-1.5 font-medium">
-                <span className="text-gray-300">المغرب</span>
-                <span className="text-white font-semibold">
-                  {loadingPrayers
-                    ? '06:07 م'
-                    : formatTime(prayerTimes?.maghrib)}
-                </span>
-              </div>
-
-              {/* العشاء */}
-              <div className="flex justify-between items-center py-1 px-1.5 font-medium">
-                <span className="text-gray-300">العشاء</span>
-                <span className="text-white font-semibold">
-                  {loadingPrayers
-                    ? '07:25 م'
-                    : formatTime(prayerTimes?.isha)}
-                </span>
-              </div>
+              {PRAYER_ROWS.map(([key, name]) => {
+                const active = prayer?.next?.key === key;
+                return (
+                  <div
+                    key={key}
+                    className={
+                      active
+                        ? 'flex justify-between items-center bg-[#b8860b]/35 border border-[#c69234]/50 text-[#fef08a] px-3 py-1.5 rounded-lg font-bold shadow-sm'
+                        : 'flex justify-between items-center py-1 px-1.5 font-medium'
+                    }
+                  >
+                    <span className={active ? '' : 'text-gray-300'}>
+                      {active ? `• ${name} (التالية)` : name}
+                    </span>
+                    <span className={active ? '' : 'text-white font-semibold'}>
+                      {formatTime(prayerTimes?.[key])}
+                    </span>
+                  </div>
+                );
+              })}
 
             </div>
           </div>
@@ -290,7 +229,6 @@ const Hero = ({ bgImageUrl }) => {
           {/* Glassmorphism Audio Player */}
           {/* <div className="relative overflow-hidden bg-[#0a1e17]/35 backdrop-blur-xl border border-white/15 rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 shadow-[0_8px_32px_rgba(0,0,0,0.25)] ring-1 ring-white/5 transition-all duration-300 hover:bg-[#0a1e17]/45 hover:border-white/20"> */}
 <div className="relative overflow-hidden bg-white/[0.035] backdrop-blur-sm border border-white/10 rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 shadow-[0_8px_32px_rgba(0,0,0,0.12)] ring-1 ring-white/[0.04] transition-all duration-300 hover:bg-white/[0.06] hover:border-white/15 ">
-            {/* لمعة زجاجية خفيفة */}
             <div
               className="absolute inset-0 bg-gradient-to-br from-white/[0.08] via-transparent to-transparent pointer-events-none rounded-2xl"
               aria-hidden="true"
