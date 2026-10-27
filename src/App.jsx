@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from
 import { useEffect } from "react";
 import { HomePage } from "./features/Home/HomePage";
 import AdhkarSection from "./features/Home/AdhkarSection";
-
+import PrayerTimesPage from './components/PrayerTimesPage';
 function ScrollToTop() {
   const { pathname } = useLocation();
 
@@ -37,8 +37,9 @@ export default function App() {
         <Route path="/adhkar" element={<AdhkarSection />} />
         <Route path="/azkar" element={<Navigate to="/adhkar" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/prayers" element={<PrayerTimesPage />} />
       </Routes>
     </BrowserRouter>
   );
 }
-
+

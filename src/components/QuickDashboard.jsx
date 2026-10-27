@@ -60,7 +60,7 @@ const QUICK_LINKS = [
   {
     title: "مواقيت الصلاة",
     subtitle: "حسب موقعك",
-    href: "#prayers",
+    href: "/prayers", // تم تعديلها لتنتقل لصفحة مواقيت الصلاة الجديدة
     Icon: Clock,
     iconColor: "#c4320a",
     bg: "#fff5eb",
@@ -230,7 +230,6 @@ const QuickDashboard = () => {
           >
             <div>
               <div className="flex items-center gap-4">
-                {/* Replace with your own image */}
                 <div className="h-14 w-14 shrink-0 overflow-hidden rounded-[14px] bg-[#e7f1eb] xl:h-16 xl:w-16">
                   <img
                     src="/images/athkar.jpeg"
@@ -242,7 +241,6 @@ const QuickDashboard = () => {
                 <div className="min-w-0 flex-1">
                   <h3 className="flex items-center gap-1.5 text-lg font-extrabold text-[#073c30] xl:text-xl">
                     <span>الأذكار والأدعية</span>
-                    {/* <Sparkles className="h-4 w-4 shrink-0 text-[#07966b] xl:h-5 xl:w-5" /> */}
                   </h3>
 
                   <p className="mt-1 text-[11px] text-[#67736d] xl:text-xs">
@@ -284,7 +282,6 @@ const QuickDashboard = () => {
           >
             <div>
               <div className="flex items-center gap-4">
-                {/* Replace with your own image */}
                 <div className="h-14 w-14 shrink-0 overflow-hidden rounded-[14px] bg-[#f9eed5] xl:h-16 xl:w-16">
                   <img
                     src="/images/moshaf.jpeg"
@@ -349,33 +346,40 @@ const QuickDashboard = () => {
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8 xl:gap-4 2xl:gap-5">
             {QUICK_LINKS.map(
-              ({ title, subtitle, href, Icon, iconColor, bg }) => (
-                <a
-                  key={href}
-                  href={href}
-                  className="group flex min-w-0 min-h-[125px] flex-col items-center justify-center rounded-[16px] border border-[#edf0ed] bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:border-[#d9e7df] hover:shadow-sm xl:min-h-[140px] xl:py-5 2xl:min-h-[150px]"
-                >
-                  <div
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] transition-transform group-hover:scale-105 xl:h-12 xl:w-12"
-                    style={{ backgroundColor: bg, color: iconColor }}
+              ({ title, subtitle, href, Icon, iconColor, bg }) => {
+                // نحدد ما إذا كان الرابط مسار داخلي مثل /prayers أو رابط عادي
+                const isInternal = href.startsWith("/");
+                const Component = isInternal ? Link : "a";
+                const linkProps = isInternal ? { to: href } : { href };
+
+                return (
+                  <Component
+                    key={href}
+                    {...linkProps}
+                    className="group flex min-w-0 min-h-[125px] flex-col items-center justify-center rounded-[16px] border border-[#edf0ed] bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:border-[#d9e7df] hover:shadow-sm xl:min-h-[140px] xl:py-5 2xl:min-h-[150px]"
                   >
-                    <Icon
-                      className="h-5 w-5 xl:h-6 xl:w-6"
-                      strokeWidth={2}
-                    />
-                  </div>
+                    <div
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] transition-transform group-hover:scale-105 xl:h-12 xl:w-12"
+                      style={{ backgroundColor: bg, color: iconColor }}
+                    >
+                      <Icon
+                        className="h-5 w-5 xl:h-6 xl:w-6"
+                        strokeWidth={2}
+                      />
+                    </div>
 
-                  <div className="mt-3">
-                    <h4 className="text-[11px] font-extrabold leading-5 text-[#073c30] xl:text-xs 2xl:text-sm">
-                      {title}
-                    </h4>
+                    <div className="mt-3">
+                      <h4 className="text-[11px] font-extrabold leading-5 text-[#073c30] xl:text-xs 2xl:text-sm">
+                        {title}
+                      </h4>
 
-                    <p className="mt-1 text-[9px] leading-4 text-[#8a9690] xl:text-[10px] 2xl:text-xs">
-                      {subtitle}
-                    </p>
-                  </div>
-                </a>
-              )
+                      <p className="mt-1 text-[9px] leading-4 text-[#8a9690] xl:text-[10px] 2xl:text-xs">
+                        {subtitle}
+                      </p>
+                    </div>
+                  </Component>
+                );
+              }
             )}
           </div>
         </div>
