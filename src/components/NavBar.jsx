@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState, useRef } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Search,
   Bell,
@@ -10,16 +10,42 @@ import { usePrayerTimes } from '../api/usePrayerTimes';
 
 const Navbar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const isHome = location.pathname === '/' || location.pathname === '/home';
-  const isAdhkar = location.pathname.startsWith('/adhkar') || location.pathname.startsWith('/azkar');
+  const isAdhkar =
+    location.pathname.startsWith('/adhkar') ||
+    location.pathname.startsWith('/azkar');
 
   const prayer = usePrayerTimes(); // null لحد ما البيانات توصل
   const [searchQuery, setSearchQuery] = useState('');
+  const imgRef = useRef(null);
 
+  // تنسيق الوقت بصيغة 12 ساعة بالعربية
   const formatTime = (isoString) => {
     if (!isoString) return '--:--';
-    const [h, m] = isoString.slice(11, 16).split(':').map(Number);
-    return `${String(h % 12 || 12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${h < 12 ? 'ص' : 'م'}`;
+    const timePart = isoString.slice(11, 16);
+    const [h, m] = timePart.split(':').map(Number);
+    const displayHour = h % 12 || 12;
+    const period = h < 12 ? 'ص' : 'م';
+    return `${String(displayHour).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`;
+  };
+
+  // معالج فشل تحميل الصورة بدون حلقة لا نهائية
+  const handleImgError = (e) => {
+    const fallback = '/mosque.png';
+    const current = e.currentTarget.getAttribute('src');
+    if (current !== fallback) {
+      e.currentTarget.src = fallback;
+    }
+  };
+
+  // تقديم البحث عبر React Router
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    const query = searchQuery.trim();
+    if (query) {
+      navigate(`/search?q=${encodeURIComponent(query)}`);
+    }
   };
 
   return (
@@ -39,27 +65,23 @@ const Navbar = () => {
             {/* مكان صورة اللوجو */}
             <div className="w-12 h-12 sm:w-14 sm:h-14 2xl:w-16 2xl:h-16 shrink-0 flex items-center justify-center">
               <img
+                ref={imgRef}
                 src="/images/logo.png"
                 alt="شعار الشيخ عبدالرحمن الزواوي"
                 className="w-full h-full object-contain"
-                onError={(e) => {
-                  if (e.currentTarget.src !== window.location.origin + '/mosque.png') {
-                    e.currentTarget.src = '/mosque.png';
-                  }
-                }}
+                onError={handleImgError}
               />
             </div>
 
             {/* اسم الشيخ */}
             <div className="text-right">
-        <h1 className="font-display text-xs sm:text-sm font-extrabold leading-[1.35] text-wird-green text-right">    الشيخ
-                 <br />
-               عبدالرحمن
-               <br />
-            الزواوي
-        </h1>
-
-          
+              <h1 className="font-sans text-xs sm:text-sm font-extrabold leading-[1.35] text-[#1b4332] text-right">
+                الشيخ
+                <br />
+                عبدالرحمن
+                <br />
+                الزواوي
+              </h1>
             </div>
           </Link>
 
@@ -147,14 +169,7 @@ const Navbar = () => {
             {/* شريط البحث */}
             <form
               className="relative w-full sm:flex-1 xl:flex-none xl:w-[200px] 2xl:w-[260px] min-w-0"
-              onSubmit={(e) => {
-                e.preventDefault();
-
-                if (searchQuery.trim()) {
-                  window.location.hash =
-                    `search?q=${encodeURIComponent(searchQuery.trim())}`;
-                }
-              }}
+              onSubmit={handleSearchSubmit}
             >
               <input
                 type="search"
