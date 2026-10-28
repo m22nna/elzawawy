@@ -39,7 +39,25 @@ export function markDone(slug, index) {
   const p = loadProgress();
   const list = Array.isArray(p.done[slug]) ? p.done[slug] : [];
   if (list.includes(index)) return;
-  saveProgress(withActivity({ ...p, done: { ...p.done, [slug]: [...list, index] } }));
+  saveProgress(
+    withActivity({ ...p, last: slug, done: { ...p.done, [slug]: [...list, index] } })
+  );
+  try {
+    window.dispatchEvent(new Event("wird:update"));
+  } catch {}
+}
+
+// بيشتغل لما التقدّم يتغيّر (نفس التاب أو تاب تاني)
+export function subscribeProgress(cb) {
+  const onStorage = (e) => {
+    if (e.key === null || e.key === KEY) cb();
+  };
+  window.addEventListener("wird:update", cb);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener("wird:update", cb);
+    window.removeEventListener("storage", onStorage);
+  };
 }
 
 export const doneCount = (p, slug) =>

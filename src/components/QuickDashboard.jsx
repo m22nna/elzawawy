@@ -13,6 +13,10 @@ import {
   Quote,
   ScrollText,
 } from "lucide-react";
+import { useAdhkarProgress } from "../features/Home/hooks/useAdhkarProgress";
+import { getLastRead } from "../features/Quran/lastRead";
+import { TOTAL_PAGES, hizbOfPage, juzOfPage } from "../features/Quran/mushaf";
+import { arNum } from "../features/Quran/utils";
 
 const API_URL = "https://zawawy-api-staging.onrender.com";
 
@@ -20,7 +24,7 @@ const QUICK_LINKS = [
   {
     title: "القرآن الكريم",
     subtitle: "تلاوة ومصحف",
-    href: "#quran",
+    href: "/quran",
     Icon: BookOpen,
     iconColor: "#087c58",
     bg: "#e9fbf3",
@@ -44,7 +48,7 @@ const QUICK_LINKS = [
   {
     title: "التنزيلات",
     subtitle: "للاستماع دون إنترنت",
-    href: "#downloads",
+    href: "/downloads",
     Icon: Download,
     iconColor: "#244fd0",
     bg: "#eef4ff",
@@ -68,7 +72,7 @@ const QUICK_LINKS = [
   {
     title: "شورتس إسلامية",
     subtitle: "مقاطع قصيرة مؤثرة",
-    href: "#shorts",
+    href: "/shorts",
     Icon: PlayCircle,
     iconColor: "#c51b42",
     bg: "#fff0f3",
@@ -84,11 +88,16 @@ const QUICK_LINKS = [
 ];
 
 const QuickDashboard = () => {
+  const wird = useAdhkarProgress();
   const [hadith, setHadith] = useState(null);
   const [loadingHadith, setLoadingHadith] = useState(true);
 
-  const [dailyAyah, setDailyAyah] = useState(null);
-  const [loadingAyah, setLoadingAyah] = useState(true);
+  // آخر مكان وقف عنده في المصحف (بيتحفظ من صفحة القرآن)
+  const [lastRead] = useState(getLastRead);
+  const readPage = lastRead?.page ?? 1;
+  const readLabel = lastRead
+    ? `${lastRead.surahName ? `سورة ${lastRead.surahName} – ` : ""}صفحة ${arNum(readPage)}`
+    : "سورة الفاتحة – صفحة ١";
 
   // Fetch random hadith
   useEffect(() => {
@@ -119,39 +128,6 @@ const QuickDashboard = () => {
     };
 
     fetchHadith();
-
-    return () => controller.abort();
-  }, []);
-
-  // Fetch daily ayah
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const fetchDailyAyah = async () => {
-      try {
-        const response = await fetch(
-          `${API_URL}/v1/daily/today`,
-          { signal: controller.signal }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch daily ayah");
-        }
-
-        const data = await response.json();
-        setDailyAyah(data);
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          console.error("خطأ في جلب الآية اليومية:", error);
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoadingAyah(false);
-        }
-      }
-    };
-
-    fetchDailyAyah();
 
     return () => controller.abort();
   }, []);
@@ -253,7 +229,7 @@ const QuickDashboard = () => {
 
               <div className="mt-6 flex min-h-[66px] items-center justify-between gap-3 rounded-[15px] border border-[#e5eee9] bg-[#f1f7f4] px-4 xl:mt-7 xl:min-h-[72px]">
                 <div className="shrink-0 rounded-full bg-[#cdf8e6] px-3 py-1.5 text-[10px] font-extrabold text-[#087451] xl:text-xs">
-                  18 / 25 منجز
+                  {wird.total ? `${wird.done} / ${wird.total} منجز` : "-- / -- منجز"}
                 </div>
 
                 <div className="text-right">
@@ -261,7 +237,7 @@ const QuickDashboard = () => {
                     الورد المستحق:
                   </p>
                   <p className="mt-1 text-xs font-extrabold text-[#073c30] xl:text-sm">
-                    أذكار الصباح والمساء
+                    {wird.name || "أذكار اليوم"}
                   </p>
                 </div>
               </div>
@@ -300,37 +276,41 @@ const QuickDashboard = () => {
                   </h3>
 
                   <p className="mt-1 text-[11px] text-[#67736d] xl:text-xs">
-                    متابعة القراءة اليومية من صفحة 1
+                    {lastRead
+                      ? `متابعة القراءة من صفحة ${arNum(readPage)}`
+                      : "ابدأ قراءة المصحف من صفحة ١"}
                   </p>
                 </div>
               </div>
 
               <div className="mt-8 xl:mt-10">
                 <div className="flex items-center justify-between gap-3 text-[11px] font-extrabold xl:text-xs">
-                  <span className="min-w-0 text-[#073c30]">
-                    سورة{" "}
-                    {dailyAyah?.surahNameArabic || "الفاتحة"} – الآية{" "}
-                    {dailyAyah?.ayahNumber || 1}
-                  </span>
+                  <span className="min-w-0 text-[#073c30]">{readLabel}</span>
 
                   <span className="shrink-0 text-[#c58b24]">
-                    جزء 1 · حزب 1
+                    جزء {arNum(juzOfPage(readPage))} · حزب{" "}
+                    {arNum(hizbOfPage(readPage))}
                   </span>
                 </div>
 
                 <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-[#e6eee9]">
-                  <div className="h-full w-[15%] rounded-full bg-[#c99435]" />
+                  <div
+                    className="h-full rounded-full bg-[#c99435]"
+                    style={{
+                      width: `${Math.max(2, (readPage / TOTAL_PAGES) * 100)}%`,
+                    }}
+                  />
                 </div>
               </div>
             </div>
 
-            <button
-              type="button"
+            <Link
+              to={`/quran/page/${readPage}`}
               className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#003c2d] text-xs font-extrabold text-white transition-colors hover:bg-[#07513d] xl:h-11 xl:text-sm"
             >
-              <span>متابعة القراءة</span>
+              <span>{lastRead ? "متابعة القراءة" : "ابدأ القراءة"}</span>
               <ArrowLeft className="h-4 w-4" />
-            </button>
+            </Link>
           </article>
         </div>
 
@@ -349,33 +329,40 @@ const QuickDashboard = () => {
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8 xl:gap-4 2xl:gap-5">
             {QUICK_LINKS.map(
-              ({ title, subtitle, href, Icon, iconColor, bg }) => (
-                <a
-                  key={href}
-                  href={href}
-                  className="group flex min-w-0 min-h-[125px] flex-col items-center justify-center rounded-[16px] border border-[#edf0ed] bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:border-[#d9e7df] hover:shadow-sm xl:min-h-[140px] xl:py-5 2xl:min-h-[150px]"
-                >
-                  <div
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] transition-transform group-hover:scale-105 xl:h-12 xl:w-12"
-                    style={{ backgroundColor: bg, color: iconColor }}
+              ({ title, subtitle, href, Icon, iconColor, bg }) => {
+                // روابط الصفحات الداخلية (بتبدأ بـ /) بتتنقل بدون ريفريش
+                const isPage = href.startsWith("/");
+                const Tile = isPage ? Link : "a";
+                const linkProps = isPage ? { to: href } : { href };
+
+                return (
+                  <Tile
+                    key={href}
+                    {...linkProps}
+                    className="group flex min-w-0 min-h-[125px] flex-col items-center justify-center rounded-[16px] border border-[#edf0ed] bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:border-[#d9e7df] hover:shadow-sm xl:min-h-[140px] xl:py-5 2xl:min-h-[150px]"
                   >
-                    <Icon
-                      className="h-5 w-5 xl:h-6 xl:w-6"
-                      strokeWidth={2}
-                    />
-                  </div>
+                    <div
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] transition-transform group-hover:scale-105 xl:h-12 xl:w-12"
+                      style={{ backgroundColor: bg, color: iconColor }}
+                    >
+                      <Icon
+                        className="h-5 w-5 xl:h-6 xl:w-6"
+                        strokeWidth={2}
+                      />
+                    </div>
 
-                  <div className="mt-3">
-                    <h4 className="text-[11px] font-extrabold leading-5 text-[#073c30] xl:text-xs 2xl:text-sm">
-                      {title}
-                    </h4>
+                    <div className="mt-3">
+                      <h4 className="text-[11px] font-extrabold leading-5 text-[#073c30] xl:text-xs 2xl:text-sm">
+                        {title}
+                      </h4>
 
-                    <p className="mt-1 text-[9px] leading-4 text-[#8a9690] xl:text-[10px] 2xl:text-xs">
-                      {subtitle}
-                    </p>
-                  </div>
-                </a>
-              )
+                      <p className="mt-1 text-[9px] leading-4 text-[#8a9690] xl:text-[10px] 2xl:text-xs">
+                        {subtitle}
+                      </p>
+                    </div>
+                  </Tile>
+                );
+              }
             )}
           </div>
         </div>
