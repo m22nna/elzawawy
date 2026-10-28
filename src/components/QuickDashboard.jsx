@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   BookOpen,
   Sparkles,
@@ -13,6 +13,8 @@ import {
   Quote,
   ScrollText,
 } from "lucide-react";
+
+import { fetchRandomHadith } from "../api/hadithApi";
 
 const API_URL = "https://zawawy-api-staging.onrender.com";
 
@@ -28,7 +30,7 @@ const QUICK_LINKS = [
   {
     title: "الأحاديث النبوية",
     subtitle: "صحيح ومأثور",
-    href: "#hadith",
+    href: "/ahadith",
     Icon: BookMarked,
     iconColor: "#a94b00",
     bg: "#fff5e8",
@@ -84,43 +86,57 @@ const QUICK_LINKS = [
 ];
 
 const QuickDashboard = () => {
-  const [hadith, setHadith] = useState(null);
-  const [loadingHadith, setLoadingHadith] = useState(true);
+  const [hadith, setHadith] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('currentHadith');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return null;
+  });
+  const [loadingHadith, setLoadingHadith] = useState(!hadith);
 
   const [dailyAyah, setDailyAyah] = useState(null);
   const [loadingAyah, setLoadingAyah] = useState(true);
 
-  // Fetch random hadith
+  // Fetch or sync random hadith
   useEffect(() => {
-    const controller = new AbortController();
+    let isMounted = true;
 
-    const fetchHadith = async () => {
-      try {
-        const response = await fetch(
-          `${API_URL}/v1/hadiths/random`,
-          { signal: controller.signal }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch hadith");
-        }
-
-        const data = await response.json();
-        setHadith(data);
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          console.error("خطأ في جلب الحديث:", error);
-        }
-      } finally {
-        if (!controller.signal.aborted) {
+    try {
+      const saved = sessionStorage.getItem('currentHadith');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.textArabic) {
+          setHadith(parsed);
           setLoadingHadith(false);
+          return;
         }
       }
+    } catch (e) {}
+
+    fetchRandomHadith()
+      .then((data) => {
+        if (isMounted && data && data.textArabic) {
+          setHadith(data);
+          try {
+            sessionStorage.setItem('currentHadith', JSON.stringify(data));
+          } catch (e) {}
+        }
+      })
+      .catch((error) => {
+        if (isMounted) {
+          console.error("خطأ في جلب الحديث:", error);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoadingHadith(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
     };
-
-    fetchHadith();
-
-    return () => controller.abort();
   }, []);
 
   // Fetch daily ayah
@@ -169,6 +185,8 @@ const QuickDashboard = () => {
       }`
     : "رواه أمير المؤمنين عمر بن الخطاب رضي الله عنه";
 
+    const navigator = useNavigate();
+    
   return (
     <section
       dir="rtl"
@@ -215,7 +233,15 @@ const QuickDashboard = () => {
 
             <button
               type="button"
-              className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#f0dfc8] bg-white text-xs font-extrabold text-[#073c30] transition-colors hover:bg-[#fffaf2] xl:h-11 xl:text-sm"
+              onClick={() => {
+                if (hadith) {
+                  try {
+                    sessionStorage.setItem('currentHadith', JSON.stringify(hadith));
+                  } catch (e) {}
+                }
+                navigator('/tafseerhadith', { state: { hadith } });
+              }}
+              className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#f0dfc8] bg-white text-xs font-extrabold text-[#073c30] transition-colors hover:bg-[#fffaf2] xl:h-11 xl:text-sm cursor-pointer"
             >
               <span>شرح وتدبر الحديث</span>
               <ArrowLeft className="h-4 w-4" />

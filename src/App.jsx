@@ -3,6 +3,8 @@ import { useEffect } from "react";
 import { HomePage } from "./features/Home/HomePage";
 import AdhkarSection from "./features/Home/AdhkarSection";
 import PrayerTimesPage from './components/PrayerTimesPage';
+import AhadithHomePage from "./components/Ahadees/AhadithHomePage";
+import TafseerHomePage from "./components/TafseerAhadith/TafseerHomePage";
 function ScrollToTop() {
   const { pathname } = useLocation();
 
@@ -36,8 +38,10 @@ export default function App() {
         <Route path="/home" element={<Navigate to="/" replace />} />
         <Route path="/adhkar" element={<AdhkarSection />} />
         <Route path="/azkar" element={<Navigate to="/adhkar" replace />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
         <Route path="/prayers" element={<PrayerTimesPage />} />
+        <Route path="/ahadith" element={<AhadithHomePage />} />
+        <Route path="/tafseerhadith" element={<TafseerHomePage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
