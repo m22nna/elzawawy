@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   BookOpen,
   Sparkles,
@@ -18,6 +18,8 @@ import { getLastRead } from "../features/Quran/lastRead";
 import { TOTAL_PAGES, hizbOfPage, juzOfPage } from "../features/Quran/mushaf";
 import { arNum } from "../features/Quran/utils";
 
+import { fetchRandomHadith } from "../api/hadithApi";
+
 const API_URL = "https://zawawy-api-staging.onrender.com";
 
 const QUICK_LINKS = [
@@ -32,7 +34,7 @@ const QUICK_LINKS = [
   {
     title: "الأحاديث النبوية",
     subtitle: "صحيح ومأثور",
-    href: "#hadith",
+    href: "/ahadith",
     Icon: BookMarked,
     iconColor: "#a94b00",
     bg: "#fff5e8",
@@ -64,7 +66,7 @@ const QUICK_LINKS = [
   {
     title: "مواقيت الصلاة",
     subtitle: "حسب موقعك",
-    href: "#prayers",
+    href: "/prayers", // تم تعديلها لتنتقل لصفحة مواقيت الصلاة الجديدة
     Icon: Clock,
     iconColor: "#c4320a",
     bg: "#fff5eb",
@@ -88,9 +90,17 @@ const QUICK_LINKS = [
 ];
 
 const QuickDashboard = () => {
+
   const wird = useAdhkarProgress();
-  const [hadith, setHadith] = useState(null);
-  const [loadingHadith, setLoadingHadith] = useState(true);
+
+  const [hadith, setHadith] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('currentHadith');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return null;
+  });
+  const [loadingHadith, setLoadingHadith] = useState(!hadith);
 
   // آخر مكان وقف عنده في المصحف (بيتحفظ من صفحة القرآن)
   const [lastRead] = useState(getLastRead);
@@ -99,37 +109,45 @@ const QuickDashboard = () => {
     ? `${lastRead.surahName ? `سورة ${lastRead.surahName} – ` : ""}صفحة ${arNum(readPage)}`
     : "سورة الفاتحة – صفحة ١";
 
-  // Fetch random hadith
+  // Fetch or sync random hadith
   useEffect(() => {
-    const controller = new AbortController();
+    let isMounted = true;
 
-    const fetchHadith = async () => {
-      try {
-        const response = await fetch(
-          `${API_URL}/v1/hadiths/random`,
-          { signal: controller.signal }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch hadith");
-        }
-
-        const data = await response.json();
-        setHadith(data);
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          console.error("خطأ في جلب الحديث:", error);
-        }
-      } finally {
-        if (!controller.signal.aborted) {
+    try {
+      const saved = sessionStorage.getItem('currentHadith');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.textArabic) {
+          setHadith(parsed);
           setLoadingHadith(false);
+          return;
         }
       }
+    } catch (e) {}
+
+    fetchRandomHadith()
+      .then((data) => {
+        if (isMounted && data && data.textArabic) {
+          setHadith(data);
+          try {
+            sessionStorage.setItem('currentHadith', JSON.stringify(data));
+          } catch (e) {}
+        }
+      })
+      .catch((error) => {
+        if (isMounted) {
+          console.error("خطأ في جلب الحديث:", error);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoadingHadith(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
     };
-
-    fetchHadith();
-
-    return () => controller.abort();
   }, []);
 
   const hadithText =
@@ -145,6 +163,8 @@ const QuickDashboard = () => {
       }`
     : "رواه أمير المؤمنين عمر بن الخطاب رضي الله عنه";
 
+    const navigator = useNavigate();
+    
   return (
     <section
       dir="rtl"
@@ -191,7 +211,15 @@ const QuickDashboard = () => {
 
             <button
               type="button"
-              className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#f0dfc8] bg-white text-xs font-extrabold text-[#073c30] transition-colors hover:bg-[#fffaf2] xl:h-11 xl:text-sm"
+              onClick={() => {
+                if (hadith) {
+                  try {
+                    sessionStorage.setItem('currentHadith', JSON.stringify(hadith));
+                  } catch (e) {}
+                }
+                navigator('/tafseerhadith', { state: { hadith } });
+              }}
+              className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#f0dfc8] bg-white text-xs font-extrabold text-[#073c30] transition-colors hover:bg-[#fffaf2] xl:h-11 xl:text-sm cursor-pointer"
             >
               <span>شرح وتدبر الحديث</span>
               <ArrowLeft className="h-4 w-4" />
@@ -206,7 +234,6 @@ const QuickDashboard = () => {
           >
             <div>
               <div className="flex items-center gap-4">
-                {/* Replace with your own image */}
                 <div className="h-14 w-14 shrink-0 overflow-hidden rounded-[14px] bg-[#e7f1eb] xl:h-16 xl:w-16">
                   <img
                     src="/images/athkar.jpeg"
@@ -218,7 +245,6 @@ const QuickDashboard = () => {
                 <div className="min-w-0 flex-1">
                   <h3 className="flex items-center gap-1.5 text-lg font-extrabold text-[#073c30] xl:text-xl">
                     <span>الأذكار والأدعية</span>
-                    {/* <Sparkles className="h-4 w-4 shrink-0 text-[#07966b] xl:h-5 xl:w-5" /> */}
                   </h3>
 
                   <p className="mt-1 text-[11px] text-[#67736d] xl:text-xs">
@@ -260,7 +286,6 @@ const QuickDashboard = () => {
           >
             <div>
               <div className="flex items-center gap-4">
-                {/* Replace with your own image */}
                 <div className="h-14 w-14 shrink-0 overflow-hidden rounded-[14px] bg-[#f9eed5] xl:h-16 xl:w-16">
                   <img
                     src="/images/moshaf.jpeg"
@@ -330,13 +355,13 @@ const QuickDashboard = () => {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8 xl:gap-4 2xl:gap-5">
             {QUICK_LINKS.map(
               ({ title, subtitle, href, Icon, iconColor, bg }) => {
-                // روابط الصفحات الداخلية (بتبدأ بـ /) بتتنقل بدون ريفريش
-                const isPage = href.startsWith("/");
-                const Tile = isPage ? Link : "a";
-                const linkProps = isPage ? { to: href } : { href };
+                // نحدد ما إذا كان الرابط مسار داخلي مثل /prayers أو رابط عادي
+                const isInternal = href.startsWith("/");
+                const Component = isInternal ? Link : "a";
+                const linkProps = isInternal ? { to: href } : { href };
 
                 return (
-                  <Tile
+                  <Component
                     key={href}
                     {...linkProps}
                     className="group flex min-w-0 min-h-[125px] flex-col items-center justify-center rounded-[16px] border border-[#edf0ed] bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:border-[#d9e7df] hover:shadow-sm xl:min-h-[140px] xl:py-5 2xl:min-h-[150px]"
@@ -360,7 +385,7 @@ const QuickDashboard = () => {
                         {subtitle}
                       </p>
                     </div>
-                  </Tile>
+                  </Component>
                 );
               }
             )}

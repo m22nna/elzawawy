@@ -2,9 +2,15 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from
 import { useEffect } from "react";
 import { HomePage } from "./features/Home/HomePage";
 import AdhkarSection from "./features/Home/AdhkarSection";
+
 import DownloadsPage from "./features/Downloads/DownloadsPage";
 import QuranPage from "./features/Quran/QuranPage";
 import ShortsPage from "./features/Shorts/ShortsPage";
+
+
+import PrayerTimesPage from './components/PrayerTimesPage';
+import AhadithHomePage from "./components/Ahadees/AhadithHomePage";
+import TafseerHomePage from "./components/TafseerAhadith/TafseerHomePage";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -42,8 +48,13 @@ export default function App() {
         <Route path="/quran/*" element={<QuranPage />} />
         <Route path="/shorts" element={<ShortsPage />} />
         <Route path="/azkar" element={<Navigate to="/adhkar" replace />} />
+        <Route path="/prayers" element={<PrayerTimesPage />} />
+        <Route path="/ahadith" element={<AhadithHomePage />} />
+        <Route path="/tafseerhadith" element={<TafseerHomePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
+
 }
+
