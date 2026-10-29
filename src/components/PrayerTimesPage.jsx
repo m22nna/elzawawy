@@ -1,151 +1,295 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Bell, 
-  Volume2, 
-  Compass, 
-  Calendar,
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  Bell,
+  BellOff,
+  Compass,
   Sun,
   Moon,
   Sunrise,
   Sunset,
   Clock,
   Timer,
-  Play,
-  Pause,
-  SkipForward,
-  SkipBack,
-  RotateCcw,
-  RotateCw,
   Sparkles,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
   ArrowLeft,
-  PlayCircle,
+  CirclePlay,
+  CirclePause,
   SlidersHorizontal,
   MapPin,
   CalendarDays
 } from 'lucide-react';
 import Navbar from './NavBar';
-
-/* ---------- أدوات الوقت (نظام 12 ساعة) ---------- */
-const parseHM = (iso) => {
-  const m = /T(\d{2}):(\d{2})/.exec(iso || '');
-  return m ? { h: parseInt(m[1], 10), m: parseInt(m[2], 10) } : null;
-};
-
-const fmt12 = (iso) => {
-  const t = parseHM(iso);
-  if (!t) return '--:--';
-  const h12 = t.h % 12 === 0 ? 12 : t.h % 12;
-  return `${String(h12).padStart(2, '0')}:${String(t.m).padStart(2, '0')}`;
-};
-
-const period = (iso) => {
-  const t = parseHM(iso);
-  if (!t) return '';
-  return t.h >= 12 ? 'مساءً' : 'صباحاً';
-};
+import { PlayerProvider, usePlayer } from '../features/Quran/player/PlayerProvider';
+import PlayerBar from '../features/Quran/components/PlayerBar';
+import { useSurahs, useTracks } from '../features/Quran/hooks/useQuranData';
+import { MonthModal, PlaceModal, QiblaModal } from './prayer/PrayerModals';
+import {
+  ADHAN_URL,
+  DEFAULT_PLACE,
+  HERO_IMAGE,
+  METHOD_INFO,
+  ORDINALS,
+  addDays,
+  ampm,
+  arDigits,
+  compassName,
+  computeState,
+  dateKey,
+  fetchMonth,
+  fmt12,
+  isValidTz,
+  neededMonths,
+  period,
+  placeKeyOf,
+  qiblaBearing
+} from './prayer/prayerUtils';
 
 /* ---------- الألوان ---------- */
 const C = {
   bg: '#f7f6f1',
   green: '#0f3d30',
   greenCard: '#175040',
-  greenBtn: '#0b3a2e',
   gold: '#c9a45c',
   goldText: '#b98f3e',
   border: '#e6e3da',
   muted: '#6b7280'
 };
 
-const PrayerTimesPage = () => {
-  const [timeLeft, setTimeLeft] = useState({ hours: '01', minutes: '25', seconds: '33' });
+const CARDS = [
+  { key: 'fajr', name: 'الفجر', Icon: Sunrise, iconColor: 'text-slate-500' },
+  { key: 'sunrise', name: 'الشروق', Icon: Sun, iconColor: 'text-amber-400' },
+  { key: 'dhuhr', name: 'الظهر', Icon: Sun, iconColor: 'text-slate-500' },
+  { key: 'asr', name: 'العصر', Icon: Sun, iconColor: 'text-orange-400' },
+  { key: 'maghrib', name: 'المغرب', Icon: Sunset, iconColor: 'text-orange-500' },
+  { key: 'isha', name: 'العشاء', Icon: Moon, iconColor: 'text-slate-600' }
+];
+
+const TAB_OFFSET = { yesterday: -1, today: 0, tomorrow: 1 };
+const PLACE_KEY = 'zawawy:prayer:place';
+const ADHAN_KEY = 'zawawy:prayer:adhan';
+
+const loadPlace = () => {
+  try {
+    const p = JSON.parse(localStorage.getItem(PLACE_KEY));
+    if (p && p.lat && p.lng && p.tz && isValidTz(p.tz)) return p;
+  } catch {
+    /* التخزين ممنوع أو بيانات تالفة */
+  }
+  return DEFAULT_PLACE;
+};
+
+const loadAdhanOn = () => {
+  try {
+    return localStorage.getItem(ADHAN_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+};
+
+function PrayerTimesContent() {
+  const player = usePlayer();
   const [activeTab, setActiveTab] = useState('today');
-  const [prayerData, setPrayerData] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(true);
-  
-  const [isAdhanPlaying, setIsAdhanPlaying] = useState(false);
-  const [adhanAudio] = useState(new Audio('https://islamic-audio.org/adhan/makkah.mp3'));
+  const [modal, setModal] = useState(null); // null | 'place' | 'month' | 'qibla'
+  const [methodOpen, setMethodOpen] = useState(true);
+  const [place, setPlace] = useState(loadPlace);
+  const placeKey = placeKeyOf(place);
 
+  /* الوقت الحالي (بيتحدّث كل ثانية) */
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const fetchPrayerTimes = async () => {
-      try {
-        const params = new URLSearchParams({
-          latitude: '30.0444',
-          longitude: '31.2357',
-          month: '2026-10',
-          timezone: 'Africa/Cairo',
-          country: 'EG'
-        });
-
-        const res = await fetch(`https://zawawy-api-staging.onrender.com/v1/prayer-times?${params.toString()}`);
-        if (res.ok) {
-          const data = await res.json();
-          setPrayerData(data);
-        } else {
-          console.error("فشل في استجابة الخادم:", res.status);
-        }
-      } catch (err) {
-        console.error('API Fetch Error:', err);
-      }
-    };
-
-    fetchPrayerTimes();
-  }, []);
-
-  const todayRecord = prayerData?.days?.[24] || prayerData?.days?.[0];
-  const timings = todayRecord?.timings || {
-    fajr: '',
-    sunrise: '',
-    dhuhr: '',
-    asr: '',
-    maghrib: '',
-    isha: ''
-  };
-  const methodName = prayerData?.method?.name || 'الهيئة المصرية العامة للمساحة';
-
-  const toggleAdhanAudio = () => {
-    if (isAdhanPlaying) {
-      adhanAudio.pause();
-      setIsAdhanPlaying(false);
-    } else {
-      adhanAudio.play().then(() => {
-        setIsAdhanPlaying(true);
-      }).catch(err => console.error("تعذر تشغيل ملف الأذان:", err));
-    }
-  };
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const now = new Date();
-      const target = new Date();
-      target.setHours(15, 15, 0);
-      let diff = Math.floor((target.getTime() - now.getTime()) / 1000);
-      if (diff < 0) diff += 24 * 3600;
-      setTimeLeft({
-        hours: String(Math.floor(diff / 3600)).padStart(2, '0'),
-        minutes: String(Math.floor((diff % 3600) / 60)).padStart(2, '0'),
-        seconds: String(diff % 60).padStart(2, '0')
-      });
-    }, 1000);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const cards = [
-    { key: 'fajr', name: 'الفجر', Icon: Sunrise, iconColor: 'text-slate-500', sub: 'مضت' },
-    { key: 'sunrise', name: 'الشروق', Icon: Sun, iconColor: 'text-amber-400', sub: 'وقت الإشراق' },
-    { key: 'dhuhr', name: 'الظهر', Icon: Sun, iconColor: 'text-slate-500', sub: 'مضت' },
-    { key: 'asr', name: 'العصر', state: 'current' },
-    { key: 'maghrib', name: 'المغرب', state: 'next' },
-    { key: 'isha', name: 'العشاء', Icon: Moon, iconColor: 'text-slate-600', sub: 'لاحقة' }
-  ];
+  /* ---------- جلب المواقيت ---------- */
+  const [months, setMonths] = useState({}); // 'lat,lng|YYYY-MM' -> days[]
+  const [methods, setMethods] = useState({}); // 'lat,lng' -> { id, name }
+  const [error, setError] = useState(false);
+  const [retryTick, setRetryTick] = useState(0);
+  const loaded = useRef({});
 
-  const tabBtn = (id, label, extra = '') =>
-    `px-3 py-1.5 rounded-full text-[11px] font-bold transition cursor-pointer flex items-center gap-1 ${extra} ${
+  const todayKey = dateKey(now, place.tz);
+  const neededKey = neededMonths(todayKey).join(',');
+
+  const loadMonth = useCallback(
+    async (ym, signal) => {
+      const key = `${placeKey}|${ym}`;
+      if (loaded.current[key]) return;
+      const data = await fetchMonth(place, ym, signal);
+      loaded.current[key] = true;
+      setMonths((prev) => ({ ...prev, [key]: data?.days ?? [] }));
+      if (data?.method) setMethods((prev) => ({ ...prev, [placeKey]: data.method }));
+    },
+    [place, placeKey]
+  );
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    setError(false);
+    Promise.all(neededKey.split(',').map((ym) => loadMonth(ym, ctrl.signal))).catch((err) => {
+      if (err.name === 'AbortError') return;
+      console.error('API Fetch Error:', err);
+      setError(true);
+    });
+    return () => ctrl.abort();
+  }, [neededKey, loadMonth, retryTick]);
+
+  const getMonth = useCallback((ym) => months[`${placeKey}|${ym}`], [months, placeKey]);
+
+  // كل أيام المدينة الحالية المتحمّلة، بمفتاح التاريخ
+  const byDate = useMemo(() => {
+    const map = new Map();
+    Object.keys(months)
+      .filter((k) => k.startsWith(`${placeKey}|`))
+      .forEach((k) => months[k].forEach((rec) => map.set(rec.timings?.fajr?.slice(0, 10), rec)));
+    return map;
+  }, [months, placeKey]);
+
+  /* ---------- الصلاة الحالية والقادمة ---------- */
+  const { next, prev, current } = computeState(byDate, now, todayKey);
+  const todayRecord = byDate.get(todayKey);
+  const selectedRecord = byDate.get(addDays(todayKey, TAB_OFFSET[activeTab]));
+  const timings = selectedRecord?.timings ?? {};
+  const isTodayTab = activeTab === 'today';
+
+  const secs = next ? Math.max(0, Math.floor((next.t - now) / 1000)) : null;
+  const timeLeft = {
+    hours: secs == null ? '--' : String(Math.floor(secs / 3600)).padStart(2, '0'),
+    minutes: secs == null ? '--' : String(Math.floor((secs % 3600) / 60)).padStart(2, '0'),
+    seconds: secs == null ? '--' : String(secs % 60).padStart(2, '0')
+  };
+  const countdownText = `${timeLeft.hours}:${timeLeft.minutes}:${timeLeft.seconds}`;
+
+  const elapsedPct = prev && next ? Math.min(100, Math.max(0, ((now - prev.t) / (next.t - prev.t)) * 100)) : 0;
+  const remainingPct = Math.round(100 - elapsedPct);
+
+  /* ---------- التاريخ في الهيدر ---------- */
+  const weekday = new Intl.DateTimeFormat('ar-EG', { timeZone: place.tz, weekday: 'long' }).format(now);
+  const gregorian = new Intl.DateTimeFormat('ar-EG', {
+    timeZone: place.tz,
+    calendar: 'gregory',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  }).format(now);
+  const hijri = todayRecord?.hijri;
+  const hijriText = hijri ? `${arDigits(hijri.day)} ${hijri.monthNameArabic} ${arDigits(hijri.year)} هـ` : '';
+
+  /* ---------- طريقة الحساب ---------- */
+  const method = methods[placeKey];
+  const methodInfo = METHOD_INFO[method?.id];
+  const methodName = methodInfo?.name ?? method?.name ?? 'الجهة المعتمدة';
+  const placeTitle = `${place.name}${place.countryName ? `، ${place.countryName}` : ''}`;
+
+  /* ---------- القبلة ---------- */
+  const bearing = useMemo(() => qiblaBearing(Number(place.lat), Number(place.lng)), [place]);
+
+  /* ---------- حالة كل كارت ---------- */
+  const cardState = (key) => {
+    if (!isTodayTab) return null;
+    if (current?.offset === 0 && current.key === key) return 'current';
+    if (next?.offset === 0 && next.key === key) return 'next';
+    return null;
+  };
+
+  const cardSub = (key) => {
+    if (!isTodayTab) return '';
+    if (key === 'sunrise') return 'وقت الإشراق';
+    const t = Date.parse(timings[key]);
+    if (Number.isNaN(t)) return '';
+    return t <= now ? 'مضت' : 'لاحقة';
+  };
+
+  /* ---------- نداء الأذان ---------- */
+  const adhanRef = useRef(null);
+  const firedRef = useRef(null);
+  const [adhanOn, setAdhanOn] = useState(loadAdhanOn);
+  const [isAdhanPlaying, setIsAdhanPlaying] = useState(false);
+  const [adhanError, setAdhanError] = useState(false);
+
+  const getAdhan = () => {
+    if (!adhanRef.current) {
+      const audio = new Audio(ADHAN_URL);
+      audio.addEventListener('ended', () => setIsAdhanPlaying(false));
+      audio.addEventListener('pause', () => setIsAdhanPlaying(false));
+      audio.addEventListener('error', () => {
+        setIsAdhanPlaying(false);
+        setAdhanError(true);
+      });
+      adhanRef.current = audio;
+    }
+    return adhanRef.current;
+  };
+
+  useEffect(() => () => adhanRef.current?.pause(), []);
+
+  const playAdhan = () => {
+    if (player?.playing) player.toggle(player.surahId); // نوقف التلاوة وقت الأذان
+    const audio = getAdhan();
+    audio.currentTime = 0;
+    return audio
+      .play()
+      .then(() => {
+        setIsAdhanPlaying(true);
+        setAdhanError(false);
+      })
+      .catch((err) => {
+        console.error('تعذر تشغيل ملف الأذان:', err);
+        setAdhanError(true);
+      });
+  };
+  const playAdhanRef = useRef(playAdhan);
+  playAdhanRef.current = playAdhan;
+
+  const toggleAdhanAudio = () => {
+    if (isAdhanPlaying) getAdhan().pause();
+    else playAdhan();
+  };
+
+  const toggleAdhanOn = () => {
+    const nextVal = !adhanOn;
+    setAdhanOn(nextVal);
+    try {
+      localStorage.setItem(ADHAN_KEY, nextVal ? 'on' : 'off');
+    } catch {
+      /* التخزين ممنوع */
+    }
+  };
+
+  // لما يحين وقت صلاة والتشغيل التلقائي مفعّل والصفحة مفتوحة، يشتغل الأذان
+  useEffect(() => {
+    if (!adhanOn || !prev) return;
+    const age = now - prev.t;
+    if (age >= 0 && age < 5000 && firedRef.current !== prev.t) {
+      firedRef.current = prev.t;
+      playAdhanRef.current();
+    }
+  }, [now, prev, adhanOn]);
+
+  /* ---------- تغيير المدينة ---------- */
+  const changePlace = (p) => {
+    setPlace(p);
+    setActiveTab('today');
+    setError(false);
+    firedRef.current = null;
+    try {
+      localStorage.setItem(PLACE_KEY, JSON.stringify(p));
+    } catch {
+      /* التخزين ممنوع */
+    }
+    setModal(null);
+  };
+
+  const tabBtn = (id) =>
+    `px-3 py-1.5 rounded-full text-[11px] font-bold transition cursor-pointer flex items-center gap-1 ${
       activeTab === id ? 'bg-[#0f3d30] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
     }`;
+
+  const loadingData = !todayRecord && !error;
 
   return (
     <div
@@ -174,53 +318,73 @@ const PrayerTimesPage = () => {
           <div className="space-y-1.5 text-[12px] pb-0.5">
             <div className="flex items-center gap-2">
               <MapPin className="w-3.5 h-3.5" style={{ color: C.goldText }} />
-              <span className="font-bold" style={{ color: C.green }}>القاهرة، جمهورية مصر العربية</span>
-              <span className="text-[10px] font-semibold cursor-pointer hover:underline" style={{ color: C.goldText }}>
+              <span className="font-bold" style={{ color: C.green }}>{placeTitle}</span>
+              <button
+                type="button"
+                onClick={() => setModal('place')}
+                className="text-[10px] font-semibold cursor-pointer hover:underline"
+                style={{ color: C.goldText }}
+              >
                 تغيير
-              </span>
+              </button>
             </div>
             <div className="flex items-center gap-2 text-slate-600 font-medium">
               <Clock className="w-3.5 h-3.5" style={{ color: C.goldText }} />
-              <span>الخميس، ١٤ ربيع الأول ١٤٤٧ هـ — ٢٥ سبتمبر ٢٠٢٥ م</span>
+              <span>
+                {weekday}
+                {hijriText ? `، ${hijriText}` : ''} — {gregorian}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ============ البانر الرئيسي الطويل (مطابق لخلفية الصورة الرمضانية) ============ */}
+      {/* ============ البانر الرئيسي ============ */}
       <div className="max-w-[1320px] mx-auto px-4 sm:px-6 lg:px-8 mt-8 mb-8">
         <div className="relative rounded-[32px] overflow-hidden shadow-2xl bg-[#1a1208] text-white min-h-[460px] flex items-center border border-[#2d2214]">
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url('/images/moshaf.jpeg')` }}
-          ></div>
+          <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: HERO_IMAGE }}></div>
           <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/25 to-black/40"></div>
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20"></div>
 
           <div className="relative z-10 w-full grid grid-cols-1 lg:grid-cols-2 gap-8 p-8 sm:p-14 min-h-[460px] items-center">
             {/* اليمين: تفاصيل الصلاة */}
             <div className="flex flex-col justify-between gap-8 text-right h-full py-4">
-              <div className="inline-flex items-center gap-2 bg-black/50 border border-amber-300/40 text-amber-100 text-[11px] px-4 py-1.5 rounded-full w-fit backdrop-blur-md font-semibold">
+              <div className="inline-flex items-center gap-2 bg-black/40 border border-amber-300/30 text-amber-100 text-[11px] px-4 py-1.5 rounded-full w-fit backdrop-blur-md font-semibold">
                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
                 <span>الصلاة القادمة</span>
               </div>
 
               <div className="my-2">
-                <p className="text-xs sm:text-[13px] text-white/90 mb-2 font-medium tracking-wide">
-                  الفرض الرابع لهذا اليوم • حافظوا على الصلوات
-                </p>
-                <h2 className="text-5xl sm:text-7xl font-black leading-tight text-white mb-3">
-                  صلاة العصر
+                {error && !todayRecord ? (
+                  <p className="text-xs sm:text-[13px] text-white/90 mb-2 font-medium tracking-wide">
+                    تعذّر تحميل المواقيت.{' '}
+                    <button
+                      type="button"
+                      onClick={() => setRetryTick((t) => t + 1)}
+                      className="underline font-bold text-amber-300 cursor-pointer"
+                    >
+                      إعادة المحاولة
+                    </button>
+                  </p>
+                ) : (
+                  <p className="text-xs sm:text-[13px] text-white/90 mb-2 font-medium tracking-wide drop-shadow">
+                    {next
+                      ? `الفرض ${ORDINALS[next.order]} ${next.offset === 0 ? 'لهذا اليوم' : 'ليوم الغد'} • حافظوا على الصلوات`
+                      : 'حافظوا على الصلوات'}
+                  </p>
+                )}
+                <h2 className="text-5xl sm:text-7xl font-black leading-tight text-white mb-3 drop-shadow-lg">
+                  {next ? `صلاة ${next.name}` : loadingData ? 'جاري التحميل...' : 'مواقيت الصلاة'}
                 </h2>
                 <div className="flex items-baseline gap-3 mt-2">
-                  <span className="text-6xl sm:text-7xl font-black tracking-tight" style={{ color: '#d6b068' }}>
-                    {fmt12(timings.asr)}
+                  <span className="text-6xl sm:text-7xl font-black tracking-tight drop-shadow-lg" style={{ color: '#d6b068' }}>
+                    {fmt12(next?.iso)}
                   </span>
-                  <span className="text-2xl font-bold text-white/90">{period(timings.asr)}</span>
+                  <span className="text-2xl font-bold text-white/90">{period(next?.iso)}</span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2.5 text-[11px] text-white/85 bg-black/40 w-fit px-4 py-2 rounded-xl border border-white/10 backdrop-blur-sm">
+              <div className="flex items-center gap-2.5 text-[11px] text-white/85 w-fit drop-shadow">
                 <span className="flex items-end gap-[3px] h-3.5">
                   <i className="w-[3px] h-2 bg-amber-300/90 rounded"></i>
                   <i className="w-[3px] h-3.5 bg-amber-300/90 rounded"></i>
@@ -232,52 +396,71 @@ const PrayerTimesPage = () => {
 
             {/* اليسار: العدّاد والتشغيل */}
             <div className="flex flex-col justify-between gap-6 text-right h-full py-4 border-t lg:border-t-0 lg:border-r border-white/10 lg:pr-8 pt-6 lg:pt-0">
-              <div className="inline-flex items-center gap-2 bg-black/40 border border-white/20 text-white/90 text-[11px] px-3.5 py-1.5 rounded-xl w-fit backdrop-blur-md font-semibold">
-                <Bell className="w-3.5 h-3.5 text-amber-300" />
-                <span>أذان الحرم المكي مفعّل</span>
-              </div>
+              <button
+                type="button"
+                onClick={toggleAdhanOn}
+                aria-pressed={adhanOn}
+                title="يشغّل الأذان تلقائياً عند دخول وقت كل صلاة طالما الصفحة مفتوحة"
+                className="inline-flex items-center gap-2 bg-black/40 border border-white/20 text-white/90 text-[11px] px-3.5 py-1.5 rounded-xl w-fit backdrop-blur-md font-semibold cursor-pointer hover:bg-black/55 transition"
+              >
+                {adhanOn ? <Bell className="w-3.5 h-3.5 text-amber-300" /> : <BellOff className="w-3.5 h-3.5 text-white/60" />}
+                <span>{adhanOn ? 'أذان الحرم المكي مفعّل' : 'الأذان التلقائي متوقف'}</span>
+              </button>
 
               <div>
-                <div className="flex items-center gap-2 text-xs text-white/90 mb-3 font-semibold">
+                <div className="flex items-center gap-2 text-xs text-white/90 mb-3 font-semibold drop-shadow">
                   <Timer className="w-4 h-4 text-amber-300" />
-                  <span>الوقت المتبقي للأذان ⏳</span>
+                  <span>الوقت المتبقي للأذان</span>
                 </div>
 
-                <div className="flex items-start gap-4 w-fit my-2" dir="ltr">
+                <div className="flex items-start gap-5 w-fit my-2" dir="ltr">
                   {[
                     { v: timeLeft.hours, l: 'ساعة' },
                     { v: timeLeft.minutes, l: 'دقيقة' },
                     { v: timeLeft.seconds, l: 'ثانية' }
                   ].map((b, i) => (
                     <React.Fragment key={b.l}>
-                      {i > 0 && <span className="text-4xl font-black text-white/50 leading-[1] mt-3">:</span>}
-                      <div className="text-center bg-black/40 border border-white/10 px-4 py-3 rounded-2xl backdrop-blur-sm min-w-[75px]">
-                        <span className="block text-5xl sm:text-[60px] leading-none font-black text-white">{b.v}</span>
-                        <span className="block text-[11px] text-white/80 font-bold mt-2">{b.l}</span>
+                      {i > 0 && <span className="text-4xl font-black text-white/40 leading-[1] mt-3">:</span>}
+                      <div className="text-center min-w-[64px]">
+                        <span className="block text-5xl sm:text-[64px] leading-none font-black text-white tabular-nums drop-shadow-lg">
+                          {b.v}
+                        </span>
+                        <span className="block text-[11px] text-white/80 font-bold mt-2 drop-shadow">{b.l}</span>
                       </div>
                     </React.Fragment>
                   ))}
                 </div>
 
                 <div className="mt-6 max-w-[360px]">
-                  <div className="w-full bg-white/20 h-[4px] rounded-full overflow-hidden">
-                    <div className="h-full w-[34%] rounded-full mr-0" style={{ backgroundColor: '#d6b068' }}></div>
+                  <div className="w-full bg-white/25 h-[4px] rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full mr-0"
+                      style={{ width: `${elapsedPct}%`, backgroundColor: '#d6b068' }}
+                    ></div>
                   </div>
-                  <div className="flex items-center justify-between text-[10px] text-white/85 mt-2 font-medium">
-                    <span>الظهر ({fmt12(timings.dhuhr)} {period(timings.dhuhr) === 'مساءً' ? 'م' : 'ص'})</span>
-                    <span className="font-bold text-amber-300">متبقي 66% من الوقت</span>
-                    <span>العصر ({fmt12(timings.asr)} {period(timings.asr) === 'مساءً' ? 'م' : 'ص'})</span>
+                  <div className="flex items-center justify-between text-[10px] text-white/85 mt-2 font-medium drop-shadow">
+                    <span>{prev ? `${prev.name} (${fmt12(prev.iso)} ${ampm(prev.iso)})` : ''}</span>
+                    <span className="font-bold text-amber-300">
+                      {prev && next ? `متبقي ${remainingPct}% من الوقت` : ''}
+                    </span>
+                    <span>{next ? `${next.name} (${fmt12(next.iso)} ${ampm(next.iso)})` : ''}</span>
                   </div>
                 </div>
               </div>
 
-              <button 
-                onClick={toggleAdhanAudio}
-                className="flex items-center gap-2 text-xs text-white font-bold cursor-pointer w-fit bg-[#0f3d30] hover:bg-[#175040] border border-emerald-500/30 px-5 py-2.5 rounded-xl transition shadow-lg mt-2"
-              >
-                <PlayCircle className="w-5 h-5 text-amber-300" />
-                <span>{isAdhanPlaying ? "إيقاف نداء الأذان" : "استماع لنداء الأذان"}</span>
-              </button>
+              <div>
+                <button
+                  type="button"
+                  onClick={toggleAdhanAudio}
+                  className="flex items-center gap-2 text-xs text-white font-bold cursor-pointer w-fit hover:text-amber-200 transition drop-shadow"
+                >
+                  {isAdhanPlaying ? <CirclePause className="w-5 h-5" /> : <CirclePlay className="w-5 h-5" />}
+                  <span>{isAdhanPlaying ? 'إيقاف نداء الأذان' : 'استماع لنداء الأذان'}</span>
+                </button>
+                {adhanError && (
+                  <p className="mt-1.5 text-[10px] text-amber-200">تعذّر تشغيل ملف الأذان، تأكد من رابط الملف.</p>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -296,9 +479,11 @@ const PrayerTimesPage = () => {
         </div>
 
         <div className="bg-white rounded-2xl border overflow-hidden grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" style={{ borderColor: C.border }}>
-          {cards.map((c) => {
-            const isCurrent = c.state === 'current';
-            const isNext = c.state === 'next';
+          {CARDS.map((c) => {
+            const state = cardState(c.key);
+            const isCurrent = state === 'current';
+            const isNext = state === 'next';
+            const sub = cardSub(c.key);
             return (
               <div
                 key={c.key}
@@ -306,7 +491,8 @@ const PrayerTimesPage = () => {
                 style={{
                   borderColor: C.border,
                   backgroundColor: isCurrent ? C.greenCard : isNext ? '#eef5f1' : '#ffffff',
-                  color: isCurrent ? '#ffffff' : C.green
+                  color: isCurrent ? '#ffffff' : C.green,
+                  boxShadow: isCurrent ? `inset 0 3px 0 ${C.gold}` : undefined
                 }}
               >
                 <div className="flex items-start justify-between">
@@ -324,11 +510,14 @@ const PrayerTimesPage = () => {
                       القادمة
                     </span>
                   )}
-                  {c.Icon && <c.Icon className={`w-4 h-4 ${c.iconColor}`} />}
+                  {!isCurrent && !isNext && <c.Icon className={`w-4 h-4 ${c.iconColor}`} />}
                 </div>
 
                 <div>
-                  <div className={`text-[28px] leading-tight font-black mt-2 ${isCurrent ? 'text-white' : ''}`} style={!isCurrent ? { color: c.key === 'sunrise' ? '#6b7280' : C.green } : {}}>
+                  <div
+                    className={`text-[28px] leading-tight font-black mt-2 ${isCurrent ? 'text-white' : ''}`}
+                    style={!isCurrent ? { color: c.key === 'sunrise' ? '#6b7280' : C.green } : {}}
+                  >
                     {fmt12(timings[c.key])}
                   </div>
                   <div className={`text-[10px] mt-2 font-medium ${isCurrent ? 'text-white/80' : 'text-slate-500'}`}>
@@ -342,10 +531,10 @@ const PrayerTimesPage = () => {
                     ) : isNext ? (
                       <span className="flex items-center gap-1 font-bold" style={{ color: '#087c58' }}>
                         <span className="w-1 h-1 rounded-full bg-amber-400"></span>
-                        متبقي 01:25:34
+                        متبقي {countdownText}
                       </span>
                     ) : (
-                      <span className="text-slate-500">{c.sub}</span>
+                      <span className="text-slate-500">{sub}</span>
                     )}
                   </div>
                 </div>
@@ -365,7 +554,7 @@ const PrayerTimesPage = () => {
                 <ChevronRight className="w-3 h-3" />
                 <span>الأمس</span>
               </button>
-              <button onClick={() => setActiveTab('today')} className={tabBtn('today', '', '')}>
+              <button onClick={() => setActiveTab('today')} className={tabBtn('today')}>
                 اليوم
               </button>
               <button onClick={() => setActiveTab('tomorrow')} className={tabBtn('tomorrow')}>
@@ -375,7 +564,9 @@ const PrayerTimesPage = () => {
             </div>
 
             <button
-              className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg transition cursor-pointer border"
+              type="button"
+              onClick={() => setModal('month')}
+              className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg transition cursor-pointer border hover:bg-[#f3efe2]"
               style={{ color: C.goldText, borderColor: C.border, backgroundColor: '#faf8f2' }}
             >
               <CalendarDays className="w-3.5 h-3.5" />
@@ -384,7 +575,12 @@ const PrayerTimesPage = () => {
           </div>
 
           <div className="bg-white p-5 rounded-2xl border text-right" style={{ borderColor: C.border }}>
-            <div className="flex items-start justify-between mb-4">
+            <button
+              type="button"
+              onClick={() => setMethodOpen((o) => !o)}
+              aria-expanded={methodOpen}
+              className="flex w-full items-start justify-between cursor-pointer text-right"
+            >
               <div className="flex items-start gap-3">
                 <div className="p-2 rounded-lg bg-[#f1f0ea] text-slate-600">
                   <SlidersHorizontal className="w-4 h-4" />
@@ -396,27 +592,33 @@ const PrayerTimesPage = () => {
                   </p>
                 </div>
               </div>
-              <ChevronDown className="w-4 h-4 text-slate-400 mt-1" />
-            </div>
+              <ChevronDown className={`w-4 h-4 text-slate-400 mt-1 transition-transform ${methodOpen ? '' : '-rotate-90'}`} />
+            </button>
 
-            <div className="grid grid-cols-3 gap-2 text-right pt-3 border-t px-1 mb-3" style={{ borderColor: C.border }}>
-              <div>
-                <div className="text-slate-400 text-[10px] font-semibold">زاوية الفجر:</div>
-                <div className="font-extrabold text-[#0f172a] text-[12px] mt-0.5">19.5°</div>
-              </div>
-              <div>
-                <div className="text-slate-400 text-[10px] font-semibold">زاوية العشاء:</div>
-                <div className="font-extrabold text-[#0f172a] text-[12px] mt-0.5">17.5°</div>
-              </div>
-              <div>
-                <div className="text-slate-400 text-[10px] font-semibold">حساب العصر:</div>
-                <div className="font-extrabold text-[#0f172a] text-[12px] mt-0.5">ظل المثل الواحد</div>
-              </div>
-            </div>
+            {methodOpen && (
+              <div className="mt-4">
+                <div className="grid grid-cols-3 gap-2 text-right pt-3 border-t px-1 mb-3" style={{ borderColor: C.border }}>
+                  <div>
+                    <div className="text-slate-400 text-[10px] font-semibold">زاوية الفجر:</div>
+                    <div className="font-extrabold text-[#0f172a] text-[12px] mt-0.5">{methodInfo?.fajr ?? '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-[10px] font-semibold">زاوية العشاء:</div>
+                    <div className="font-extrabold text-[#0f172a] text-[12px] mt-0.5">{methodInfo?.isha ?? '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-[10px] font-semibold">حساب العصر:</div>
+                    <div className="font-extrabold text-[#0f172a] text-[12px] mt-0.5">ظل المثل الواحد</div>
+                  </div>
+                </div>
 
-            <p className="text-[10px] text-slate-500 text-center font-medium bg-[#f7f6f1] border rounded-lg py-2.5 px-3" style={{ borderColor: C.border }}>
-              مضبوط وفق التوقيت الصيفي/الشتوي المعتمد من مجلس الوزراء ودار الإفتاء المصرية.
-            </p>
+                <p className="text-[10px] text-slate-500 text-center font-medium bg-[#f7f6f1] border rounded-lg py-2.5 px-3" style={{ borderColor: C.border }}>
+                  {place.country === 'EG'
+                    ? 'مضبوط وفق التوقيت الصيفي/الشتوي المعتمد من مجلس الوزراء ودار الإفتاء المصرية.'
+                    : 'مضبوط وفق التوقيت المحلي للمدينة المختارة (بما فيه التوقيت الصيفي/الشتوي).'}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -442,10 +644,10 @@ const PrayerTimesPage = () => {
             </div>
             <div className="flex justify-between items-center text-[10px] mt-3 pt-2 border-t border-white/10 font-bold">
               <span className="text-white/80">صحيح مسلم</span>
-              <button className="flex items-center gap-1 cursor-pointer hover:underline" style={{ color: '#d6b068' }}>
+              <Link to="/adhkar" className="flex items-center gap-1 cursor-pointer hover:underline" style={{ color: '#d6b068' }}>
                 <span>مسبحة الأذكار</span>
                 <ArrowLeft className="w-3 h-3" />
-              </button>
+              </Link>
             </div>
           </div>
 
@@ -455,12 +657,19 @@ const PrayerTimesPage = () => {
                 <Compass className="w-4 h-4" />
               </div>
               <div>
-                <div className="text-[12px] font-black text-[#0f172a]">اتجاه القبلة: 136° جنوب الشرق</div>
+                <div className="text-[12px] font-black text-[#0f172a]">
+                  اتجاه القبلة: {Math.round(bearing)}° {compassName(bearing)}
+                </div>
                 <div className="text-[10px] text-slate-500 font-medium">نحو الكعبة المشرفة بمكة المكرمة</div>
               </div>
             </div>
 
-            <button className="flex items-center gap-1.5 text-[11px] font-bold cursor-pointer hover:opacity-70 transition" style={{ color: C.green }}>
+            <button
+              type="button"
+              onClick={() => setModal('qibla')}
+              className="flex items-center gap-1.5 text-[11px] font-bold cursor-pointer hover:opacity-70 transition"
+              style={{ color: C.green }}
+            >
               <span>البوصلة</span>
               <ExternalLink className="w-3.5 h-3.5" />
             </button>
@@ -468,58 +677,26 @@ const PrayerTimesPage = () => {
         </div>
       </div>
 
-      {/* ============ مشغل الصوت السفلي ============ */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t px-4 py-2.5 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] z-50" style={{ borderColor: C.border }}>
-        <div className="max-w-[1320px] mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: C.green }}>
-              <span className="flex items-center gap-[2px] h-4">
-                <i className="w-[2px] h-2 bg-white rounded"></i>
-                <i className="w-[2px] h-4 bg-white rounded"></i>
-                <i className="w-[2px] h-3 bg-white rounded"></i>
-                <i className="w-[2px] h-2 bg-white rounded"></i>
-              </span>
-            </div>
-            <div>
-              <div className="text-[12px] font-bold text-[#0f172a]">سورة الفاتحة - تلاوة خاشعة</div>
-              <div className="text-[10px] text-slate-500">الشيخ عبد الرحمن الزواوي</div>
-            </div>
-          </div>
-
-          <div className="hidden md:flex flex-col items-center flex-1 max-w-md mx-4">
-            <div className="flex items-center gap-4 mb-1" dir="ltr">
-              <button className="text-slate-500 hover:text-slate-900 cursor-pointer"><SkipBack className="w-4 h-4" /></button>
-              <button className="text-slate-500 hover:text-slate-900 cursor-pointer"><RotateCcw className="w-4 h-4" /></button>
-              <button
-                onClick={() => setIsPlaying(!isPlaying)}
-                className="w-9 h-9 rounded-full flex items-center justify-center text-white cursor-pointer shadow"
-                style={{ backgroundColor: C.green }}
-              >
-                {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
-              </button>
-              <button className="text-slate-500 hover:text-slate-900 cursor-pointer"><RotateCw className="w-4 h-4" /></button>
-              <button className="text-slate-500 hover:text-slate-900 cursor-pointer"><SkipForward className="w-4 h-4" /></button>
-            </div>
-            
-            <div className="w-full flex items-center gap-2 text-[9px] text-slate-400">
-              <span>00:45</span>
-              <div className="flex-1 bg-slate-200 h-1 rounded-full overflow-hidden cursor-pointer">
-                <div className="h-full w-[35%] rounded-full" style={{ backgroundColor: '#d9a441' }}></div>
-              </div>
-              <span>02:18</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs" dir="ltr">
-            <div className="hidden sm:block w-10 h-1 rounded-full mr-1" style={{ backgroundColor: C.green }}></div>
-            <Volume2 className="w-4 h-4 text-slate-600 cursor-pointer" />
-            <span className="bg-slate-100 border border-slate-200 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold">1.0x</span>
-            <span className="bg-slate-100 border border-slate-200 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold">FLAC 24-bit</span>
-          </div>
-        </div>
-      </div>
+      {modal === 'place' && <PlaceModal current={place} onSelect={changePlace} onClose={() => setModal(null)} />}
+      {modal === 'month' && (
+        <MonthModal place={place} todayKey={todayKey} getMonth={getMonth} loadMonth={loadMonth} onClose={() => setModal(null)} />
+      )}
+      {modal === 'qibla' && <QiblaModal bearing={bearing} place={place} onClose={() => setModal(null)} />}
     </div>
   );
-};
+}
 
-export default PrayerTimesPage;
+export default function PrayerTimesPage() {
+  const { tracks, reciter } = useTracks();
+  const { surahs } = useSurahs();
+
+  return (
+    <PlayerProvider tracks={tracks} reciter={reciter}>
+      <PrayerTimesContent />
+
+      <div dir="rtl">
+        <PlayerBar fallbackId={1} surahs={surahs} />
+      </div>
+    </PlayerProvider>
+  );
+}
