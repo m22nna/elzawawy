@@ -35,10 +35,15 @@ export const AudioProvider = ({ children }) => {
 
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
+      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      }
     };
 
     const handleLoadedMetadata = () => {
-      setDuration(audio.duration || 0);
+      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      }
     };
 
     const handlePlay = () => {
@@ -111,8 +116,16 @@ export const AudioProvider = ({ children }) => {
 
     setFailed(false);
 
-    // If same track URL, toggle play/pause
-    if (currentTrack && currentTrack.audioUrl === trackData.audioUrl) {
+    // If same track URL or same ID, toggle play/pause
+    const isSameTrack = currentTrack && (
+      currentTrack.audioUrl === trackData.audioUrl ||
+      (trackData.id && currentTrack.id === trackData.id)
+    );
+
+    if (isSameTrack) {
+      if (trackData.title && currentTrack.title !== trackData.title) {
+        setCurrentTrack(prev => ({ ...prev, title: trackData.title }));
+      }
       if (audio.paused) {
         audio.play().catch(e => console.warn('Play error:', e));
       } else {
@@ -125,9 +138,9 @@ export const AudioProvider = ({ children }) => {
     const newTrack = {
       id: trackData.id || trackData.audioUrl,
       title: trackData.title || 'تلاوة مباركة',
-      reciter: trackData.reciter || 'فضيلة الشيخ عبدالرحمن الزواوي',
+      reciter: trackData.reciter || trackData.subtitle || 'فضيلة الشيخ عبدالرحمن الزواوي',
       audioUrl: trackData.audioUrl,
-      duration: trackData.duration || 0,
+      duration: trackData.duration || trackData.durationSeconds || 0,
       image: trackData.image,
       tag: trackData.tag
     };

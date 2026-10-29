@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import Navbar from '../../components/Navbar';
+import Navbar from '../../components/NavBar';
 import AyahNumber from '../../components/AyahNumber';
 import {
   getSurahs,

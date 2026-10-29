@@ -7,6 +7,9 @@ import AhadithHomePage from "./components/Ahadees/AhadithHomePage";
 import TafseerHomePage from "./components/TafseerAhadith/TafseerHomePage";
 import RamadanPage from './features/ramadan/RamadanPage';
 import TafseerPage from './features/tafseer/TafseerPage';
+import QuranPage from "./features/Quran/QuranPage";
+import ShortsPage from "./features/Shorts/ShortsPage";
+import DownloadsPage from "./features/Downloads/DownloadsPage";
 import { AudioProvider } from './context/AudioContext';
 import AudioPlayer from './components/AudioPlayer';
 
@@ -27,6 +30,10 @@ function HashRedirect() {
     const hash = window.location.hash.replace(/^#\/?/, "").toLowerCase();
     if (hash === "adhkar" || hash === "azkar") {
       navigate("/adhkar", { replace: true });
+    } else if (hash === "tafsir" || hash === "tafseer") {
+      navigate("/tafseer", { replace: true });
+    } else if (hash === "ramadan") {
+      navigate("/ramadan", { replace: true });
     }
   }, [navigate]);
 
@@ -47,10 +54,15 @@ export default function App() {
             <Route path="/azkar" element={<Navigate to="/adhkar" replace />} />
             <Route path="/prayers" element={<PrayerTimesPage />} />
             <Route path="/ahadith" element={<AhadithHomePage />} />
+            <Route path="/tafseerhadith/:order?" element={<TafseerHomePage />} />
             <Route path="/tafseerhadith" element={<TafseerHomePage />} />
             <Route path="/ramadan" element={<RamadanPage />} />
             <Route path="/tafseer" element={<TafseerPage />} />
-            <Route path="/quran" element={<TafseerPage />} />
+            <Route path="/tafsir" element={<Navigate to="/tafseer" replace />} />
+            <Route path="/quran" element={<QuranPage />} />
+            <Route path="/quran/*" element={<QuranPage />} />
+            <Route path="/shorts" element={<ShortsPage />} />
+            <Route path="/downloads" element={<DownloadsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
