@@ -7,7 +7,7 @@ import {
   Clock
 } from 'lucide-react';
 import { usePrayerTimes } from '../api/usePrayerTimes';
-
+import { Link } from 'react-router-dom';
 
 const PRAYER_ROWS = [
   ['fajr', 'الفجر'],
@@ -163,13 +163,13 @@ const Hero = ({ bgImageUrl }) => {
             {/* الأزرار */}
             <div className="flex flex-col gap-3 pt-2 w-full sm:w-auto items-start">
 
-              <a
-                href="#mushaf"
+              <Link
+                to="/quran"
                 className="inline-flex items-center justify-center gap-3 bg-[#13372c]/90 hover:bg-[#1a4738] text-white border border-[#245b48] font-bold px-7 py-3 rounded-xl transition-all text-sm backdrop-blur-md shadow-md min-w-[210px] w-full sm:w-auto"
               >
                 <span>تصفح المصحف</span>
                 <BookOpen className="w-4 h-4" />
-              </a>
+              </Link>
 
               <a
                 href="#recitations"
@@ -223,7 +223,7 @@ const Hero = ({ bgImageUrl }) => {
           </div>
         </div>
 
-        {/* مشغل سورة الكهف - في المنتصف ناحية الشمال */}
+
         <div className="mt-8 lg:mt-6 w-full max-w-[600px] self-center lg:translate-x-[-70px]">
 
           {/* Glassmorphism Audio Player */}
@@ -237,7 +237,7 @@ const Hero = ({ bgImageUrl }) => {
             {/* بيانات التلاوة والتحكم */}
             <div className="relative z-10 flex items-center gap-3 min-w-0">
 
-              {/* زر التشغيل */}
+              {/* زرار التشغيل */}
               <button
                 onClick={togglePlay}
                 disabled={!recitation?.audioUrl}

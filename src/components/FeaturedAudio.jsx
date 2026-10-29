@@ -1,5 +1,7 @@
 import { ArrowLeft, Download, Heart, Pause, Play } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { downloadManager } from "../features/Downloads/downloadManager";
 import { useAudio } from "../features/Home/audio/AudioContext";
 import { useFeaturedAudio } from "../features/Home/hooks/useFeaturedAudio";
 import Waveform from "./ui/Waveform";
@@ -14,10 +16,24 @@ const fmt = (s) =>
 function AudioCard({ item, reciterName }) {
   const { current, playing, progress, failed, toggle } = useAudio();
   const [liked, setLiked] = useState(false);
+  const navigate = useNavigate();
 
   const active = current?.id === item.id;
   const isPlaying = active && playing;
   const duration = fmt(item.durationSeconds);
+
+  const handleDownload = () => {
+    downloadManager.start({
+      id: `recitation-${item.id}`,
+      url: item.audioUrl,
+      title: item.title,
+      tag: "القرآن الكريم",
+      category: "quran",
+      type: "audio",
+      durationSeconds: item.durationSeconds ? Number(item.durationSeconds) : null,
+    });
+    navigate("/downloads");
+  };
 
   return (
     <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-3xl bg-wird-card p-2 shadow-soft transition duration-300 hover:-translate-y-1">
@@ -80,17 +96,15 @@ function AudioCard({ item, reciterName }) {
           </button>
 
           <div className="flex items-center gap-4 text-muted">
-            <a
-              href={item.audioUrl}
-              download
-              target="_blank"
-              rel="noreferrer"
+            <button
+              type="button"
+              onClick={handleDownload}
               aria-label="تحميل التسجيل"
               title="تحميل"
               className="transition hover:text-wird-green"
             >
               <Download size={18} />
-            </a>
+            </button>
 
             <button
               type="button"

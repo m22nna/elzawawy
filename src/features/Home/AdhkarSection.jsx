@@ -1,32 +1,21 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Bell, Bookmark, Search, Sun, Sunset, Moon, Share2, Play, Pause, RotateCw,
-  Plus, PlusCircle, ChevronRight, ChevronLeft, Volume2, CheckCircle2,
-  BadgeCheck, BookOpen, Clock, Repeat, Hand, ArrowLeft, Landmark, ScrollText,
-  Infinity as InfinityIcon, RotateCcw, SkipForward, SkipBack, Heart, X, ClipboardCheck
+  Bookmark, Sun, Sunset, Moon, Share2, Play, Pause, RotateCw, RotateCcw,
+  Plus, PlusCircle, ChevronRight, ChevronLeft, Volume2, VolumeX,
+  BadgeCheck, BookOpen, Clock, Hand, ArrowLeft, Landmark, ScrollText,
+  Infinity as InfinityIcon, SkipForward, SkipBack, Heart, X, ClipboardCheck,
+  AlertTriangle, ListMusic, ListPlus,
 } from "lucide-react";
 import { api } from "../../api/client";
-import { usePrayerTimes } from "../../api/usePrayerTimes";
-import { useKhatmDua } from "../../api/useKhatmDua";
-import { markDone } from "./wirdStore";
+import { useRecitations } from "../../api/useRecitations";
+import { markDone, loadProgress, doneCount as storeDoneCount } from "./wirdStore";
+import { useWirdAudio } from "./useWirdAudio";
+import { CATEGORY_UI, DEFAULT_UI, WIRD_AUDIO_SURAHS } from "../../config/adhkarUi";
 import Navbar from "../../components/NavBar";
 import { Link } from "react-router-dom";
 
-
-
-
-
 /* ───────────── Design tokens ───────────── */
-const C = {
-  page: "#EFF8F3",
-  ink: "#063F30",
-  mint: "#E3EEE8",
-  mintSoft: "#EAF4EF",
-  line: "#DCEAE2",
-  gold: "#7A5A14",
-  goldRing: "#C69234",
-  peach: "#FFE2A8",
-};
+const C = { goldRing: "#C69234" };
 
 const QURAN = { fontFamily: "'Amiri', 'Amiri Quran', serif" };
 const FONTS_CSS = `
@@ -36,14 +25,6 @@ const FONTS_CSS = `
 const Wrap = ({ className = "", ...p }) => (
   <div className={`mx-auto w-full max-w-[1600px] px-6 lg:px-10 ${className}`} {...p} />
 );
-
-const NAV = ["الرئيسية", "القرآن الكريم", "الأحاديث", "الأذكار", "التفاسير", "خطب ومرئيات"];
-
-const to12h = (hhmm) => {
-  if (!hhmm) return "";
-  const [h, m] = hhmm.split(":").map(Number);
-  return `${String(h % 12 || 12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${h < 12 ? "ص" : "م"}`;
-};
 
 const times = (n) => {
   if (!n || n <= 1) return "مرة واحدة";
@@ -58,802 +39,27 @@ const ORDINALS = [
   "السابع عشر", "الثامن عشر", "التاسع عشر", "العشرون",
 ];
 
-const CAT_META = {
-  morning: { Icon: Sun, iconTone: "brown", tag: "الورد الحالي", tagTone: "gold", when: "بعد صلاة الفجر حتى الشروق", group: "daily" },
-  evening: { Icon: Sunset, iconTone: "green", tag: "من العصر للغروب", tagTone: "gold", when: "من العصر حتى الغروب", group: "daily", featured: true },
-  sleep: { Icon: Moon, iconTone: "mint", tag: "قبل النوم", tagTone: "gray", when: "عند النوم وعند الاستيقاظ", group: "daily" },
-  "after-prayer": { Icon: Landmark, iconTone: "mint", tag: "عقب كل فريضة", tagTone: "gray", when: "عقب كل صلاة مفروضة", group: "daily" },
-  "waking-up": { Icon: Sun, iconTone: "cream", tag: "الاستيقاظ", tagTone: "gray", when: "عند الاستيقاظ من النوم", group: "daily" },
-  mosque: { Icon: Volume2, iconTone: "mint", tag: "النداء والدخول", tagTone: "gray", when: "عند دخول وخروج المسجد", group: "occasions" },
-  "quranic-duas": { Icon: BookOpen, iconTone: "cream", tag: "جامعة الخيرين", tagTone: "gray", when: "في كل وقت", group: "occasions" },
-  "prophetic-duas": { Icon: ScrollText, iconTone: "mint", tag: "جوامع الكلم", tagTone: "gray", when: "في كل وقت", group: "occasions" },
-  "tasbih-and-istighfar": { Icon: InfinityIcon, iconTone: "mint", tag: "ذكر مطلق", tagTone: "gray", when: "في كل وقت وحين", group: "daily" },
+const fmt = (s) => {
+  if (!Number.isFinite(s) || s <= 0) return "00:00";
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 };
 
-const FULL_ADHAKAR_DATA = [
-  {
-    "slug": "morning",
-    "nameArabic": "أذكار الصباح",
-    "sortOrder": 0,
-    "items": [
-      {
-        "textArabic": "أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ. رَبِّ أَسْأَلُكَ خَيْرَ مَا فِي هَذَا الْيَوْمِ وَخَيْرَ مَا بَعْدَهُ، وَأَعُوذُ بِكَ مِنْ شَرِّ مَا فِي هَذَا الْيَوْمِ وَشَرِّ مَا بَعْدَهُ، رَبِّ أَعُوذُ بِكَ مِنَ الْكَسَلِ وَسُوءِ الْكِبَرِ، رَبِّ أَعُوذُ بِكَ مِنْ عَذَابٍ فِي النَّارِ وَعَذَابٍ فِي الْقَبْرِ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 0
-      },
-      {
-        "textArabic": "اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ، وَأَبُوءُ لَكَ بِذَنْبِي فَاغْفِرْ لِي، فَإِنَّهُ لَا يَغْفِرُ الذُّنُوبَ إِلَّا أَنْتَ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": "سيد الاستغفار — من قالها موقناً بها حين يصبح فمات من يومه دخل الجنة.",
-        "firstAyahNumber": 1,
-        "sortOrder": 1
-      },
-      {
-        "textArabic": "( اللَّهُ لَا إِلَـٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ۚ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ ۚ لَّهُ مَا فِي السَّمَاوَاتِ وَمَا فِي الْأَرْضِ ۗ مَن ذَا الَّذِي يَشْفَعُ عِندَهُ إِلَّا بِإِذْنِهِ ۚ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ ۖ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ ۚ وَسِعَ كُرْسِيُّهُ السَّمَاوَاتِ وَالْأَرْضَ ۖ وَلَا يَئُودُهُ حِفْظُهُمَا ۚ وَهُوَ الْعَلِيُّ الْعَظِيمُ )",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": "آية الكرسي — من قرأها حين يصبح أُجير من الجن حتى يمسي.",
-        "firstAyahNumber": 1,
-        "sortOrder": 2
-      },
-      {
-        "textArabic": "بِسْمِ اللَّهِ الرَّحْمَـٰنِ الرَّحِيمِ\n( قُلْ هُوَ اللَّهُ أَحَدٌ ۝ اللَّهُ الصَّمَدُ ۝ لَمْ يَلِدْ وَلَمْ يُولَدْ ۝ وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ )",
-        "repeatCount": 3,
-        "reference": null,
-        "virtue": "سورة الإخلاص (٣ مرات) — تكفي من كل شيء.",
-        "firstAyahNumber": 1,
-        "sortOrder": 3
-      },
-      {
-        "textArabic": "بِسْمِ اللَّهِ الرَّحْمَـٰنِ الرَّحِيمِ\n( قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ ۝ مِن شَرِّ مَا خَلَقَ ۝ وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ ۝ وَمِن شَرِّ النَّفَّاثَاتِ فِي الْعُقَدِ ۝ وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ )",
-        "repeatCount": 3,
-        "reference": null,
-        "virtue": "سورة الفلق (٣ مرات) — تكفي من كل شيء.",
-        "firstAyahNumber": 1,
-        "sortOrder": 4
-      },
-      {
-        "textArabic": "بِسْمِ اللَّهِ الرَّحْمَـٰنِ الرَّحِيمِ\n( قُلْ أَعُوذُ بِرَبِّ النَّاسِ ۝ مَلِكِ النَّاسِ ۝ إِلَـٰهِ النَّاسِ ۝ مِن شَرِّ الْوَسْوَاسِ الْخَنَّاسِ ۝ الَّذِي يُوَسْوِسُ فِي صُدُورِ النَّاسِ ۝ مِنَ الْجِنَّةِ وَالنَّاسِ )",
-        "repeatCount": 3,
-        "reference": null,
-        "virtue": "سورة الناس (٣ مرات) — تكفي من كل شيء.",
-        "firstAyahNumber": 1,
-        "sortOrder": 5
-      },
-      {
-        "textArabic": "اللَّهُمَّ بِكَ أَصْبَحْنَا، وَبِكَ أَمْسَيْنَا، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ، وَإِلَيْكَ النُّشُورُ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 6
-      },
-      {
-        "textArabic": "رَضِيتُ بِاللَّهِ رَبًّا، وَبِالْإِسْلَامِ دِينًا، وَبِمُحَمَّدٍ ﷺ نَبِيًّا.",
-        "repeatCount": 3,
-        "reference": null,
-        "virtue": "من قالها ثلاثاً حين يصبح كان حقاً على الله أن يرضيه يوم القيامة.",
-        "firstAyahNumber": 1,
-        "sortOrder": 7
-      },
-      {
-        "textArabic": "اللَّهُمَّ إِنِّي أَصْبَحْتُ أُشْهِدُكَ، وَأُشْهِدُ حَمَلَةَ عَرْشِكَ، وَمَلَائِكَتَكَ، وَجَمِيعَ خَلْقِكَ، أَنَّكَ أَنْتَ اللَّهُ لَا إِلَهَ إِلَّا أَنْتَ وَحْدَكَ لَا شَرِيكَ لَكَ، وَأَنَّ مُحَمَّدًا عَبْدُكَ وَرَسُولُكَ.",
-        "repeatCount": 4,
-        "reference": null,
-        "virtue": "من قالها حين يصبح ٤ مرات أعتقه الله من النار.",
-        "firstAyahNumber": 1,
-        "sortOrder": 8
-      },
-      {
-        "textArabic": "حَسْبِيَ اللَّهُ لَا إِلَهَ إِلَّا هُوَ عَلَيْهِ تَوَكَّلْتُ وَهُوَ رَبُّ الْعَرْشِ الْعَظِيمِ.",
-        "repeatCount": 7,
-        "reference": null,
-        "virtue": "من قالها ٧ مرات كفاه الله ما أهمه من أمر الدنيا والآخرة.",
-        "firstAyahNumber": 1,
-        "sortOrder": 9
-      },
-      {
-        "textArabic": "بِسْمِ اللَّهِ الَّذِي لَا يَضُرُّ مَعَ اسْمِهِ شَيْءٌ فِي الْأَرْضِ وَلَا فِي السَّمَاءِ وَهُوَ السَّمِيعُ الْعَلِيمُ.",
-        "repeatCount": 3,
-        "reference": null,
-        "virtue": "لم يضره شيء.",
-        "firstAyahNumber": 1,
-        "sortOrder": 10
-      },
-      {
-        "textArabic": "اللَّهُمَّ عَافِنِي فِي بَدَنِي، اللَّهُمَّ عَافِنِي فِي سَمْعِي، اللَّهُمَّ عَافِنِي فِي بَصَرِي، لَا إِلَهَ إِلَّا أَنْتَ. اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْكُفْرِ وَالْفَقْرِ، وَأَعُوذُ بِكَ مِنْ عَذَابِ الْقَبْرِ، لَا إِلَهَ إِلَّا أَنْتَ.",
-        "repeatCount": 3,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 11
-      },
-      {
-        "textArabic": "اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ فِي الدُّنْيَا وَالْآخِرَةِ، اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ فِي دِينِي وَدُنْيَايَ وَأَهْلِي وَمَالِي، اللَّهُمَّ اسْتُرْ عَوْرَاتِي وَآمِنْ رَوْعَاتِي، اللَّهُمَّ احْفَظْنِي مِنْ بَيْنِ يَدَيَّ وَمِنْ خَلْفِي وَعَنْ يَمِينِي وَعَنْ شِمَالِي وَمِنْ فَوْقِي، وَأَعُوذُ بِعَظَمَتِكَ أَنْ أُغْتَالَ مِنْ تَحْتِي.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 12
-      },
-      {
-        "textArabic": "يَا حَيُّ يَا قَيُّومُ بِرَحْمَتِكَ أَسْتَغِيثُ، أَصْلِحْ لِي شَأْنِي كُلَّهُ، وَلَا تَكِلْنِي إِلَى نَفْسِي طَرْفَةَ عَيْنٍ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 13
-      },
-      {
-        "textArabic": "أَصْبَحْنَا عَلَى فِطْرَةِ الْإِسْلَامِ، وَعَلَى كَلِمَةِ الْإِخْلَاصِ، وَعَلَى دِينِ نَبِيِّنَا مُحَمَّدٍ ﷺ، وَعَلَى مِلَّةِ أَبِينَا إِبْرَاهِيمَ حَنِيفًا مُسْلِمًا وَمَا كَانَ مِنَ الْمُشْرِكِينَ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 14
-      },
-      {
-        "textArabic": "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ، عَدَدَ خَلْقِهِ، وَرِضَا نَفْسِهِ، وَزِنَةَ عَرْشِهِ، وَمِدَادَ كَلِمَاتِهِ.",
-        "repeatCount": 3,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 15
-      },
-      {
-        "textArabic": "اللَّهُمَّ إِنِّي أَسْأَلُكَ عِلْمًا نَافِعًا، وَرِزْقًا طَيِّبًا، وَعَمَلًا مُتَقَبَّلًا.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 16
-      },
-      {
-        "textArabic": "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ.",
-        "repeatCount": 100,
-        "reference": null,
-        "virtue": "حُطت خطاياه وإن كانت مثل زبد البحر.",
-        "firstAyahNumber": 1,
-        "sortOrder": 17
-      },
-      {
-        "textArabic": "لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ.",
-        "repeatCount": 100,
-        "reference": null,
-        "virtue": "كانت له عدل عشر رقاب وكُتبت له مائة حسنة ومُحيت عنه مائة سيئة.",
-        "firstAyahNumber": 1,
-        "sortOrder": 18
-      },
-      {
-        "textArabic": "أَسْتَغْفِرُ اللَّهَ وَأَتُوبُ إِلَيْهِ.",
-        "repeatCount": 100,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 19
-      }
-    ]
-  },
-  {
-    "slug": "evening",
-    "nameArabic": "أذكار المساء",
-    "sortOrder": 1,
-    "items": [
-      {
-        "textArabic": "أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ. رَبِّ أَسْأَلُكَ خَيْرَ مَا فِي هَذِهِ اللَّيْلَةِ وَخَيْرَ مَا بَعْدَهَا، وَأَعُوذُ بِكَ مِنْ شَرِّ مَا فِي هَذِهِ اللَّيْلَةِ وَشَرِّ مَا بَعْدَهَا، رَبِّ أَعُوذُ بِكَ مِنَ الْكَسَلِ وَسُوءِ الْكِبَرِ، رَبِّ أَعُوذُ بِكَ مِنْ عَذَابٍ فِي النَّارِ وَعَذَابٍ فِي الْقَبْرِ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 0
-      },
-      {
-        "textArabic": "اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ، وَأَبُوءُ لَكَ بِذَنْبِي فَاغْفِرْ لِي، فَإِنَّهُ لَا يَغْفِرُ الذُّنُوبَ إِلَّا أَنْتَ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": "سيد الاستغفار — من قالها موقناً بها حين يمسي فمات من ليلته دخل الجنة.",
-        "firstAyahNumber": 1,
-        "sortOrder": 1
-      },
-      {
-        "textArabic": "( اللَّهُ لَا إِلَـٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ۚ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ ۚ لَّهُ مَا فِي السَّمَاوَاتِ وَمَا فِي الْأَرْضِ ۗ مَن ذَا الَّذِي يَشْفَعُ عِندَهُ إِلَّا بِإِذْنِهِ ۚ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ ۖ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ ۚ وَسِعَ كُرْسِيُّهُ السَّمَاوَاتِ وَالْأَرْضَ ۖ وَلَا يَئُودُهُ حِفْظُهُمَا ۚ وَهُوَ الْعَلِيُّ الْعَظِيمُ )",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": "آية الكرسي — من قرأها حين يمسي أُجير من الجن حتى يصبح.",
-        "firstAyahNumber": 1,
-        "sortOrder": 2
-      },
-      {
-        "textArabic": "بِسْمِ اللَّهِ الرَّحْمَـٰنِ الرَّحِيمِ\n( قُلْ هُوَ اللَّهُ أَحَدٌ ۝ اللَّهُ الصَّمَدُ ۝ لَمْ يَلِدْ وَلَمْ يُولَدْ ۝ وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ )",
-        "repeatCount": 3,
-        "reference": null,
-        "virtue": "سورة الإخلاص (٣ مرات) — تكفي من كل شيء.",
-        "firstAyahNumber": 1,
-        "sortOrder": 3
-      },
-      {
-        "textArabic": "بِسْمِ اللَّهِ الرَّحْمَـٰنِ الرَّحِيمِ\n( قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ ۝ مِن شَرِّ مَا خَلَقَ ۝ وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ ۝ وَمِن شَرِّ النَّفَّاثَاتِ فِي الْعُقَدِ ۝ وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ )",
-        "repeatCount": 3,
-        "reference": null,
-        "virtue": "سورة الفلق (٣ مرات) — تكفي من كل شيء.",
-        "firstAyahNumber": 1,
-        "sortOrder": 4
-      },
-      {
-        "textArabic": "بِسْمِ اللَّهِ الرَّحْمَـٰنِ الرَّحِيمِ\n( قُلْ أَعُوذُ بِرَبِّ النَّاسِ ۝ مَلِكِ النَّاسِ ۝ إِلَـٰهِ النَّاسِ ۝ مِن شَرِّ الْوَسْوَاسِ الْخَنَّاسِ ۝ الَّذِي يُوَسْوِسُ فِي صُدُورِ النَّاسِ ۝ مِنَ الْجِنَّةِ وَالنَّاسِ )",
-        "repeatCount": 3,
-        "reference": null,
-        "virtue": "سورة الناس (٣ مرات) — تكفي من كل شيء.",
-        "firstAyahNumber": 1,
-        "sortOrder": 5
-      },
-      {
-        "textArabic": "اللَّهُمَّ بِكَ أَمْسَيْنَا، وَبِكَ أَصْبَحْنَا، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ، وَإِلَيْكَ الْمَصِيرُ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 6
-      },
-      {
-        "textArabic": "أَعُوذُ بِكَلِمَاتِ اللَّهِ التَّامَّاتِ مِنْ شَرِّ مَا خَلَقَ.",
-        "repeatCount": 3,
-        "reference": null,
-        "virtue": "لم يضره شيء في تلك الليلة.",
-        "firstAyahNumber": 1,
-        "sortOrder": 7
-      },
-      {
-        "textArabic": "رَضِيتُ بِاللَّهِ رَبًّا، وَبِالْإِسْلَامِ دِينًا، وَبِمُحَمَّدٍ ﷺ نَبِيًّا.",
-        "repeatCount": 3,
-        "reference": null,
-        "virtue": "كان حقاً على الله أن يرضيه يوم القيامة.",
-        "firstAyahNumber": 1,
-        "sortOrder": 8
-      },
-      {
-        "textArabic": "اللَّهُمَّ إِنِّي أَمْسَيْتُ أُشْهِدُكَ، وَأُشْهِدُ حَمَلَةَ عَرْشِكَ، وَمَلَائِكَتَكَ، وَجَمِيعَ خَلْقِكَ، أَنَّكَ أَنْتَ اللَّهُ لَا إِلَهَ إِلَّا أَنْتَ وَحْدَكَ لَا شَرِيكَ لَكَ، وَأَنَّ مُحَمَّدًا عَبْدُكَ وَرَسُولُكَ.",
-        "repeatCount": 4,
-        "reference": null,
-        "virtue": "من قالها ٤ مرات حين يمسي أعتقه الله من النار.",
-        "firstAyahNumber": 1,
-        "sortOrder": 9
-      },
-      {
-        "textArabic": "حَسْبِيَ اللَّهُ لَا إِلَهَ إِلَّا هُوَ عَلَيْهِ تَوَكَّلْتُ وَهُوَ رَبُّ الْعَرْشِ الْعَظِيمِ.",
-        "repeatCount": 7,
-        "reference": null,
-        "virtue": "كفاه الله ما أهمه من أمر الدنيا والآخرة.",
-        "firstAyahNumber": 1,
-        "sortOrder": 10
-      },
-      {
-        "textArabic": "بِسْمِ اللَّهِ الَّذِي لَا يَضُرُّ مَعَ اسْمِهِ شَيْءٌ فِي الْأَرْضِ وَلَا فِي السَّمَاءِ وَهُوَ السَّمِيعُ الْعَلِيمُ.",
-        "repeatCount": 3,
-        "reference": null,
-        "virtue": "لم يضره شيء.",
-        "firstAyahNumber": 1,
-        "sortOrder": 11
-      },
-      {
-        "textArabic": "اللَّهُمَّ عَافِنِي فِي بَدَنِي، اللَّهُمَّ عَافِنِي فِي سَمْعِي، اللَّهُمَّ عَافِنِي فِي بَصَرِي، لَا إِلَهَ إِلَّا أَنْتَ. اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْكُفْرِ وَالْفَقْرِ، وَأَعُوذُ بِكَ مِنْ عَذَابِ الْقَبْرِ، لَا إِلَهَ إِلَّا أَنْتَ.",
-        "repeatCount": 3,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 12
-      },
-      {
-        "textArabic": "اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ فِي الدُّنْيَا وَالْآخِرَةِ، اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ فِي دِينِي وَدُنْيَايَ وَأَهْلِي وَمَالِي، اللَّهُمَّ اسْتُرْ عَوْرَاتِي وَآمِنْ رَوْعَاتِي، اللَّهُمَّ احْفَظْنِي مِنْ بَيْنِ يَدَيَّ وَمِنْ خَلْفِي وَعَنْ يَمِينِي وَعَنْ شِمَالِي وَمِنْ فَوْقِي، وَأَعُوذُ بِعَظَمَتِكَ أَنْ أُغْتَالَ مِنْ تَحْتِي.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 13
-      },
-      {
-        "textArabic": "يَا حَيُّ يَا قَيُّومُ بِرَحْمَتِكَ أَسْتَغِيثُ، أَصْلِحْ لِي شَأْنِي كُلَّهُ، وَلَا تَكِلْنِي إِلَى نَفْسِي طَرْفَةَ عَيْنٍ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 14
-      },
-      {
-        "textArabic": "أَمْسَيْنَا عَلَى فِطْرَةِ الْإِسْلَامِ، وَعَلَى كَلِمَةِ الْإِخْلَاصِ، وَعَلَى دِينِ نَبِيِّنَا مُحَمَّدٍ ﷺ، وَعَلَى مِلَّةِ أَبِينَا إِبْرَاهِيمَ حَنِيفًا مُسْلِمًا وَمَا كَانَ مِنَ الْمُشْرِكِينَ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 15
-      },
-      {
-        "textArabic": "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ.",
-        "repeatCount": 100,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 16
-      },
-      {
-        "textArabic": "لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ.",
-        "repeatCount": 100,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 17
-      },
-      {
-        "textArabic": "اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ.",
-        "repeatCount": 10,
-        "reference": null,
-        "virtue": "من صلى عليّ حين يصبح عشراً وحين يمسي عشراً أدركته شفاعتي يوم القيامة.",
-        "firstAyahNumber": 1,
-        "sortOrder": 18
-      }
-    ]
-  },
-  {
-    "slug": "sleep",
-    "nameArabic": "أذكار النوم",
-    "sortOrder": 2,
-    "items": [
-      {
-        "textArabic": "بِاسْمِكَ اللَّهُمَّ أَمُوتُ وَأَحْيَا.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 0
-      },
-      {
-        "textArabic": "بِاسْمِكَ رَبِّي وَضَعْتُ جَنْبِي، وَبِكَ أَرْفَعُهُ، فَإِنْ أَمْسَكْتَ نَفْسِي فَارْحَمْهَا، وَإِنْ أَرْسَلْتَهَا فَاحْفَظْهَا بِمَا تَحْفَظُ بِهِ عِبَادَكَ الصَّالِحِينَ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 1
-      },
-      {
-        "textArabic": "اللَّهُمَّ أَسْلَمْتُ نَفْسِي إِلَيْكَ، وَفَوَّضْتُ أَمْرِي إِلَيْكَ، وَوَجَّهْتُ وَجْهِي إِلَيْكَ، وَأَلْجَأْتُ ظَهْرِي إِلَيْكَ، رَغْبَةً وَرَهْبَةً إِلَيْكَ، لَا مَلْجَأَ وَلَا مَنْجَا مِنْكَ إِلَّا إِلَيْكَ، آمَنْتُ بِكِتَابِكَ الَّذِي أَنْزَلْتَ، وَبِنَبِيِّكَ الَّذِي أَرْسَلْتَ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": "إذا أخذت مضجعك وتوفيت من ليلتك مت على الفطرة.",
-        "firstAyahNumber": 1,
-        "sortOrder": 2
-      },
-      {
-        "textArabic": "اللَّهُمَّ قِنِي عَذَابَكَ يَوْمَ تَبْعَثُ عِبَادَكَ.",
-        "repeatCount": 3,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 3
-      },
-      {
-        "textArabic": "( اللَّهُ لَا إِلَـٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ۚ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ ۚ لَّهُ مَا فِي السَّمَاوَاتِ وَمَا فِي الْأَرْضِ ۗ مَن ذَا الَّذِي يَشْفَعُ عِندَهُ إِلَّا بِإِذْنِهِ ۚ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ ۖ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ ۚ وَسِعَ كُرْسِيُّهُ السَّمَاوَاتِ وَالْأَرْضَ ۖ وَلَا يَئُودُهُ حِفْظُهُمَا ۚ وَهُوَ الْعَلِيُّ الْعَظِيمُ )",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": "آية الكرسي قبل النوم — لن يزال عليك من الله حافظ ولا يقربك شيطان حتى تصبح.",
-        "firstAyahNumber": 1,
-        "sortOrder": 4
-      },
-      {
-        "textArabic": "بِسْمِ اللَّهِ الرَّحْمَـٰنِ الرَّحِيمِ\n( قُلْ هُوَ اللَّهُ أَحَدٌ ۝ اللَّهُ الصَّمَدُ ۝ لَمْ يَلِدْ وَلَمْ يُولَدْ ۝ وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ )\n\nبِسْمِ اللَّهِ الرَّحْمَـٰنِ الرَّحِيمِ\n( قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ ۝ مِن شَرِّ مَا خَلَقَ ۝ وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ ۝ وَمِن شَرِّ النَّفَّاثَاتِ فِي الْعُقَدِ ۝ وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ )\n\nبِسْمِ اللَّهِ الرَّحْمَـٰنِ الرَّحِيمِ\n( قُلْ أَعُوذُ بِرَبِّ النَّاسِ ۝ مَلِكِ النَّاسِ ۝ إِلَـٰهِ النَّاسِ ۝ مِن شَرِّ الْوَسْوَاسِ الْخَنَّاسِ ۝ الَّذِي يُوَسْوِسُ فِي صُدُورِ النَّاسِ ۝ مِنَ الْجِنَّةِ وَالنَّاسِ )",
-        "repeatCount": 3,
-        "reference": null,
-        "virtue": "تُقرأ المعوذات ٣ مرات مع النفث في الكفين ومسح ما استطاع من الجسد.",
-        "firstAyahNumber": 1,
-        "sortOrder": 5
-      },
-      {
-        "textArabic": "( آمَنَ الرَّسُولُ بِمَا أُنزِلَ إِلَيْهِ مِن رَّبِّهِ وَالْمُؤْمِنُونَ ۚ كُلٌّ آمَنَ بِاللَّهِ وَمَلَائِكَتِهِ وَكُتُبِهِ وَرُسُلِهِ لَا نُفَرِّقُ بَيْنَ أَحَدٍ مِّن رُّسُلِهِ ۚ وَقَالُوا سَمِعْنَا وَأَطَعْنَا ۖ غُفْرَانَكَ رَبَّنَا وَإِلَيْكَ الْمَصِيرُ ۝ لَا يُكَلِّفُ اللَّهُ نَفْسًا إِلَّا وُسْعَهَا ۚ لَهَا مَا كَسَبَتْ وَعَلَيْهَا مَا اكْتَسَبَتْ ۗ رَبَّنَا لَا تُؤَاخِذْنَا إِن نَّسِينَا أَوْ أَخْطَأْنَا ۚ رَبَّنَا وَلَا تَحْمِلْ عَلَيْنَا إِصْرًا كَمَا حَمَلْتَهُ عَلَى الَّذِينَ مِن قَبْلِنَا ۚ رَبَّنَا وَلَا تُحَمِّلْنَا مَا لَا طَاقَةَ لَنَا بِهِ ۖ وَاعْفُ عَنَّا وَاغْفِرْ لَنَا وَارْحَمْنَا ۚ أَنتَ مَوْلَانَا فَانصُرْنَا عَلَى الْقَوْمِ الْكَافِرِينَ )",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": "الآيتان من آخر سورة البقرة — من قرأهما في ليلة كفتاه.",
-        "firstAyahNumber": 285,
-        "sortOrder": 6
-      },
-      {
-        "textArabic": "بِسْمِ اللَّهِ الرَّحْمَـٰنِ الرَّحِيمِ\n( قُلْ يَا أَيُّهَا الْكَافِرُونَ ۝ لَا أَعْبُدُ مَا تَعْبُدُونَ ۝ وَلَا أَنتُمْ عَابِدُونَ مَا أَعْبُدُ ۝ وَلَا أَنَا عَابِدٌ مَّا عَبَدتُّمْ ۝ وَلَا أَنتُمْ عَابِدُونَ مَا أَعْبُدُ ۝ لَكُمْ دِينُكُمْ وَلِيَ دِينِ )",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": "سورة الكافرون — براءة من الشرك.",
-        "firstAyahNumber": 1,
-        "sortOrder": 7
-      },
-      {
-        "textArabic": "بِسْمِ اللَّهِ الرَّحْمَـٰنِ الرَّحِيمِ\n( تَبَارَكَ الَّذِي بِيَدِهِ الْمُلْكُ وَهُوَ عَلَىٰ كُلِّ شَيْءٍ قَدِيرٌ ۝ الَّذِي خَلَقَ الْمَوْتَ وَالْحَيَاةَ لِيَبْلُوَكُمْ أَيُّكُمْ أَحْسَنُ عَمَلًا ۚ وَهُوَ الْعَزِيزُ الْغَفُورُ )",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": "سورة الملك — آيات من بدايتها.",
-        "firstAyahNumber": 1,
-        "sortOrder": 8
-      },
-      {
-        "textArabic": "سُبْحَانَ اللَّهِ (٣٣)، وَالْحَمْدُ لِلَّهِ (٣٣)، وَاللَّهُ أَكْبَرُ (٣٤).",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": "التسبيح قبل النوم خير من خادم.",
-        "firstAyahNumber": 1,
-        "sortOrder": 9
-      },
-      {
-        "textArabic": "الْحَمْدُ لِلَّهِ الَّذِي أَطْعَمَنَا وَسَقَانَا، وَكَفَانَا وَآوَانَا، فَكَمْ مِمَّنْ لَا كَافِيَ لَهُ وَلَا مُؤْوِيَ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 10
-      },
-      {
-        "textArabic": "أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ الَّذِي لَا إِلَهَ إِلَّا هُوَ الْحَيَّ الْقَيُّومَ وَأَتُوبُ إِلَيْهِ.",
-        "repeatCount": 3,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 11
-      }
-    ]
-  },
-  {
-    "slug": "after-prayer",
-    "nameArabic": "بعد الصلاة",
-    "sortOrder": 3,
-    "items": [
-      {
-        "textArabic": "أَسْتَغْفِرُ اللَّهَ.",
-        "repeatCount": 3,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 0
-      },
-      {
-        "textArabic": "اللَّهُمَّ أَنْتَ السَّلَامُ وَمِنْكَ السَّلَامُ، تَبَارَكْتَ يَا ذَا الْجَلَالِ وَالْإِكْرَامِ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 1
-      },
-      {
-        "textArabic": "لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ، اللَّهُمَّ لَا مَانِعَ لِمَا أَعْطَيْتَ، وَلَا مُعْطِيَ لِمَا مَنَعْتَ، وَلَا يَنْفَعُ ذَا الْجَدِّ مِنْكَ الْجَدُّ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 2
-      },
-      {
-        "textArabic": "لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ، لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ، لَا إِلَهَ إِلَّا اللَّهُ وَلَا نَعْبُدُ إِلَّا إِيَّاهُ، لَهُ النِّعْمَةُ وَلَهُ الْفَضْلُ وَلَهُ الثَّنَاءُ الْحَسَنُ، لَا إِلَهَ إِلَّا اللَّهُ مُخْلِصِينَ لَهُ الدِّينَ وَلَوْ كَرِهَ الْكَافِرُونَ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 3
-      },
-      {
-        "textArabic": "سُبْحَانَ اللَّهِ (٣٣)، وَالْحَمْدُ لِلَّهِ (٣٣)، وَاللَّهُ أَكْبَرُ (٣٣).",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": "ثم تمام المائة: لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ.",
-        "firstAyahNumber": 1,
-        "sortOrder": 4
-      },
-      {
-        "textArabic": "( اللَّهُ لَا إِلَـٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ۚ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ ۚ لَّهُ مَا فِي السَّمَاوَاتِ وَمَا فِي الْأَرْضِ ۗ مَن ذَا الَّذِي يَشْفَعُ عِندَهُ إِلَّا بِإِذْنِهِ ۚ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ ۖ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ ۚ وَسِعَ كُرْسِيُّهُ السَّمَاوَاتِ وَالْأَرْضَ ۖ وَلَا يَئُودُهُ حِفْظُهُمَا ۚ وَهُوَ الْعَلِيُّ الْعَظِيمُ )",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": "آية الكرسي دبر كل صلاة مكتوبة — لم يمنعه من دخول الجنة إلا أن يموت.",
-        "firstAyahNumber": 1,
-        "sortOrder": 5
-      },
-      {
-        "textArabic": "بِسْمِ اللَّهِ الرَّحْمَـٰنِ الرَّحِيمِ\n( قُلْ هُوَ اللَّهُ أَحَدٌ ۝ اللَّهُ الصَّمَدُ ۝ لَمْ يَلِدْ وَلَمْ يُولَدْ ۝ وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ )\n\nبِسْمِ اللَّهِ الرَّحْمَـٰنِ الرَّحِيمِ\n( قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ ۝ مِن شَرِّ مَا خَلَقَ ۝ وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ ۝ وَمِن شَرِّ النَّفَّاثَاتِ فِي الْعُقَدِ ۝ وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ )\n\nبِسْمِ اللَّهِ الرَّحْمَـٰنِ الرَّحِيمِ\n( قُلْ أَعُوذُ بِرَبِّ النَّاسِ ۝ مَلِكِ النَّاسِ ۝ إِلَـٰهِ النَّاسِ ۝ مِن شَرِّ الْوَسْوَاسِ الْخَنَّاسِ ۝ الَّذِي يُوَسْوِسُ فِي صُدُورِ النَّاسِ ۝ مِنَ الْجِنَّةِ وَالنَّاسِ )",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": "تُقرأ المعوذات مرة بعد كل صلاة، وثلاث مرات بعد صلاتي الفجر والمغرب.",
-        "firstAyahNumber": 1,
-        "sortOrder": 6
-      },
-      {
-        "textArabic": "اللَّهُمَّ أَعِنِّي عَلَى ذِكْرِكَ وَشُكْرِكَ وَحُسْنِ عِبَادَتِكَ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 7
-      }
-    ]
-  },
-  {
-    "slug": "waking-up",
-    "nameArabic": "الاستيقاظ",
-    "sortOrder": 4,
-    "items": [
-      {
-        "textArabic": "الْحَمْدُ لِلَّهِ الَّذِي أَحْيَانَا بَعْدَ مَا أَمَاتَنَا وَإِلَيْهِ النُّشُورُ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 0
-      },
-      {
-        "textArabic": "الْحَمْدُ لِلَّهِ الَّذِي عَافَانِي فِي جَسَدِي، وَرَدَّ عَلَيَّ رُوحِي، وَأَذِنَ لِي بِذِكْرِهِ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 1
-      },
-      {
-        "textArabic": "لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ، سُبْحَانَ اللَّهِ، وَالْحَمْدُ لِلَّهِ، وَلَا إِلَهَ إِلَّا اللَّهُ، وَاللَّهُ أَكْبَرُ، وَلَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ، رَبِّ اغْفِرْ لِي.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": "دعاء الاستيقاظ والتعارّ من الليل — غُفر له فإن دعا استُجيب له.",
-        "firstAyahNumber": 1,
-        "sortOrder": 2
-      }
-    ]
-  },
-  {
-    "slug": "mosque",
-    "nameArabic": "أذكار المسجد",
-    "sortOrder": 5,
-    "items": [
-      {
-        "textArabic": "بِسْمِ اللَّهِ، وَالصَّلَاةُ وَالسَّلَامُ عَلَى رَسُولِ اللَّهِ، اللَّهُمَّ افْتَحْ لِي أَبْوَابَ رَحْمَتِكَ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": "دعاء دخول المسجد بالقدم اليمنى.",
-        "firstAyahNumber": 1,
-        "sortOrder": 0
-      },
-      {
-        "textArabic": "أَعُوذُ بِاللَّهِ الْعَظِيمِ، وَبِوَجْهِهِ الْكَرِيمِ، وَسُلْطَانِهِ الْقَدِيمِ، مِنَ الشَّيْطَانِ الرَّجِيمِ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": "عند دخول المسجد.",
-        "firstAyahNumber": 1,
-        "sortOrder": 1
-      },
-      {
-        "textArabic": "بِسْمِ اللَّهِ، وَالصَّلَاةُ وَالسَّلَامُ عَلَى رَسُولِ اللَّهِ، اللَّهُمَّ إِنِّي أَسْأَلُكَ مِنْ فَضْلِكَ، اللَّهُمَّ اعْصِمْنِي مِنَ الشَّيْطَانِ الرَّجِيمِ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": "دعاء الخروج من المسجد بالقدم اليسرى.",
-        "firstAyahNumber": 1,
-        "sortOrder": 2
-      },
-      {
-        "textArabic": "اللَّهُمَّ اجْعَلْ فِي قَلْبِي نُورًا، وَفِي لِسَانِي نُورًا، وَفِي سَمْعِي نُورًا، وَفِي بَصَرِي نُورًا، وَمِنْ فَوْقِي نُورًا، وَمِنْ تَحْتِي نُورًا، وَعَنْ يَمِينِي نُورًا، وَعَنْ شِمَالِي نُورًا، وَمِنْ أَمَامِي نُورًا، وَمِنْ خَلْفِي نُورًا، وَاجْعَلْ لِي نُورًا.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": "دعاء الذهاب إلى المسجد.",
-        "firstAyahNumber": 1,
-        "sortOrder": 3
-      }
-    ]
-  },
-  {
-    "slug": "quranic-duas",
-    "nameArabic": "أدعية قرآنية",
-    "sortOrder": 6,
-    "items": [
-      {
-        "textArabic": "( رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ )",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 0
-      },
-      {
-        "textArabic": "( رَبَّنَا لَا تُؤَاخِذْنَا إِن نَّسِينَا أَوْ أَخْطَأْنَا ۚ رَبَّنَا وَلَا تَحْمِلْ عَلَيْنَا إِصْرًا كَمَا حَمَلْتَهُ عَلَى الَّذِينَ مِن قَبْلِنَا ۚ رَبَّنَا وَلَا تُحَمِّلْنَا مَا لَا طَاقَةَ لَنَا بِهِ ۖ وَاعْفُ عَنَّا وَاغْفِرْ لَنَا وَارْحَمْنَا ۚ أَنتَ مَوْلَانَا فَانصُرْنَا عَلَى الْقَوْمِ الْكَافِرِينَ )",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 1
-      },
-      {
-        "textArabic": "( رَبَّنَا ظَلَمْنَا أَنفُسَنَا وَإِن لَّمْ تَغْفِرْ لَنَا وَتَرْحَمْنَا لَنَكُونَنَّ مِنَ الْخَاسِرِينَ )",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 2
-      },
-      {
-        "textArabic": "( رَبِّ اشْرَحْ لِي صَدْرِي ۝ وَيَسِّرْ لِي أَمْرِي ۝ وَاحْلُلْ عُقْدَةً مِّن لِّسَانِي ۝ يَفْقَهُوا قَوْلِي )",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 3
-      },
-      {
-        "textArabic": "( رَبَّنَا هَبْ لَنَا مِنْ أَزْوَاجِنَا وَذُرِّيَّاتِنَا قُرَّةَ أَعْيُنٍ وَاجْعَلْنَا لِلْمُتَّقِينَ إِمَامًا )",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 4
-      },
-      {
-        "textArabic": "( رَّبِّ زِدْنِي عِلْمًا )",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 5
-      },
-      {
-        "textArabic": "( رَبَّنَا لَا تُزِغْ قُلُوبَنَا بَعْدَ إِذْ هَدَيْتَنَا وَهَبْ لَنَا مِن لَّدُنكَ رَحْمَةً ۚ إِنَّكَ أَنتَ الْوَهَّابُ )",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 6
-      },
-      {
-        "textArabic": "( رَبِّ اجْعَلْنِي مُقِيمَ الصَّلَاةِ وَمِن ذُرِّيَّتِي ۚ رَبَّنَا وَتَقَبَّلْ دُعَاءِ ۝ رَبَّنَا اغْفِرْ لِي وَلِوَالِدَيَّ وَلِلْمُؤْمِنِينَ يَوْمَ يَقُومُ الْحِسَابُ )",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 7
-      },
-      {
-        "textArabic": "( رَبِّ أَوْزِعْنِي أَنْ أَشْكُرَ نِعْمَتَكَ الَّتِي أَنْعَمْتَ عَلَيَّ وَعَلَىٰ وَالِدَيَّ وَأَنْ أَعْمَلَ صَالِحًا تَرْضَاهُ وَأَدْخِلْنِي بِرَحْمَتِكَ فِي عِبَادِكَ الصَّالِحِينَ )",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 8
-      },
-      {
-        "textArabic": "( لَّا إِلَـٰهَ إِلَّا أَنتَ سُبْحَانَكَ إِنِّي كُنتُ مِنَ الظَّالِمِينَ )",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 9
-      }
-    ]
-  },
-  {
-    "slug": "prophetic-duas",
-    "nameArabic": "أدعية مأثورة",
-    "sortOrder": 7,
-    "items": [
-      {
-        "textArabic": "يَا مُقَلِّبَ الْقُلُوبِ ثَبِّتْ قَلْبِي عَلَى دِينِكَ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 0
-      },
-      {
-        "textArabic": "اللَّهُمَّ إِنِّي أَسْأَلُكَ الْهُدَى وَالتُّقَى وَالْعَفَافَ وَالْغِنَى.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 1
-      },
-      {
-        "textArabic": "اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْهَمِّ وَالْحَزَنِ، وَالْعَجْزِ وَالْكَسَلِ، وَالْبُخْلِ وَالْجُبْنِ، وَضَلَعِ الدَّيْنِ، وَغَلَبَةِ الرِّجَالِ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 2
-      },
-      {
-        "textArabic": "اللَّهُمَّ أَصْلِحْ لِي دِينِي الَّذِي هُوَ عِصْمَةُ أَمْرِي، وَأَصْلِحْ لِي دُنْيَايَ الَّتِي فِيهَا مَعَاشِي، وَأَصْلِحْ لِي آخِرَتِي الَّتِي فِيهَا مَعَادِي، وَاجْعَلِ الْحَيَاةَ زِيَادَةً لِي فِي كُلِّ خَيْرٍ، وَاجْعَلِ الْمَوْتَ رَاحَةً لِي مِنْ كُلِّ شَرٍّ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 3
-      },
-      {
-        "textArabic": "اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ زَوَالِ نِعْمَتِكَ، وَتَحَوُّلِ عَافِيَتِكَ، وَفُجَاءَةِ نِقْمَتِكَ، وَجَمِيعِ سَخَطِكَ.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 4
-      },
-      {
-        "textArabic": "اللَّهُمَّ إِنِّي أَسْأَلُكَ عِلْمًا نَافِعًا، وَرِزْقًا طَيِّبًا، وَعَمَلًا مُتَقَبَّلًا.",
-        "repeatCount": 1,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 5
-      }
-    ]
-  },
-  {
-    "slug": "tasbih-and-istighfar",
-    "nameArabic": "تسابيح واستغفار",
-    "sortOrder": 8,
-    "items": [
-      {
-        "textArabic": "سُبْحَانَ اللَّهِ.",
-        "repeatCount": 33,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 0
-      },
-      {
-        "textArabic": "الْحَمْدُ لِلَّهِ.",
-        "repeatCount": 33,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 1
-      },
-      {
-        "textArabic": "اللَّهُ أَكْبَرُ.",
-        "repeatCount": 34,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 2
-      },
-      {
-        "textArabic": "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ، سُبْحَانَ اللَّهِ الْعَظِيمِ.",
-        "repeatCount": 100,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 3
-      },
-      {
-        "textArabic": "لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ.",
-        "repeatCount": 100,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 4
-      },
-      {
-        "textArabic": "أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ وَأَتُوبُ إِلَيْهِ.",
-        "repeatCount": 100,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 5
-      },
-      {
-        "textArabic": "اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ.",
-        "repeatCount": 100,
-        "reference": null,
-        "virtue": null,
-        "firstAyahNumber": 1,
-        "sortOrder": 6
-      }
-    ]
-  }
-];
+const CAT_META = {
+  morning: { Icon: Sun, iconTone: "brown", group: "daily" },
+  evening: { Icon: Sunset, iconTone: "green", group: "daily" },
+  sleep: { Icon: Moon, iconTone: "mint", group: "daily" },
+  "after-prayer": { Icon: Landmark, iconTone: "mint", group: "daily" },
+  "waking-up": { Icon: Sun, iconTone: "cream", group: "daily" },
+  mosque: { Icon: Volume2, iconTone: "mint", group: "occasions" },
+  "quranic-duas": { Icon: BookOpen, iconTone: "cream", group: "occasions" },
+  "prophetic-duas": { Icon: ScrollText, iconTone: "mint", group: "occasions" },
+  "tasbih-and-istighfar": { Icon: InfinityIcon, iconTone: "mint", group: "daily" },
+};
+const DEFAULT_META = { Icon: BookOpen, iconTone: "mint", group: "occasions" };
 
-const DEFAULT_TASBIH_CARDS = [
-  { id: "subhanAllah", text: "«سُبْحَانَ اللَّهِ وَبِحَمْدِهِ»", target: 100, label: "حُطَّتْ خَطَايَاهُ", dotColor: "#7A5A14" },
-  { id: "astaghfirullah", text: "«أَسْتَغْفِرُ اللَّهَ وَأَتُوبُ إِلَيْهِ»", target: 100, label: "مِفْتَاحُ الفَرَجِ وَالرِّزْقِ", dotColor: "#063F30" },
-  { id: "laHawla", text: "«لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ»", target: 33, label: "كَنْزٌ مِنْ كُنُوزِ الجَنَّةِ", dotColor: "#7A5A14" },
-  { id: "salawat", text: "«اللَّهُمَّ صَلِّ عَلَى نَبِيِّنَا مُحَمَّدٍ»", target: 100, label: "كُفِيتَ هَمَّكَ وَغُفِرَ ذَنْبُكَ", dotColor: "#063F30" },
-];
+const TASBIH_SLUG = "tasbih-and-istighfar";
 
 const ICON_TONE = {
   brown: "bg-[#7A5A14] text-white",
@@ -864,76 +70,155 @@ const ICON_TONE = {
 
 const WAVE = [6, 12, 8, 16, 10, 18, 7, 14, 9, 17, 6, 13, 8, 15, 10, 12, 7, 11];
 
-function HomeHeader() {
-  return <Navbar />;
+const bySortOrder = (a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0);
+
+const normalize = (list) =>
+  [...list].sort(bySortOrder).map((c) => ({
+    ...c,
+    items: [...(c.items || [])].sort(bySortOrder).map((it) => ({
+      ...it,
+      repeatCount: Number(it.repeatCount) || 1,
+    })),
+  }));
+
+const buildTasbihCards = (categories) => {
+  const cat = categories.find((c) => c.slug === TASBIH_SLUG);
+  if (!cat) return [];
+  return cat.items.map((it, i) => ({
+    id: `api_${it.sortOrder ?? i}`,
+    text: `«${String(it.textArabic).trim().replace(/[.۔]$/, "")}»`,
+    target: it.repeatCount || 1,
+    label: it.virtue || "",
+    dotColor: i % 2 === 0 ? "#7A5A14" : "#063F30",
+  }));
+};
+
+const fractionFromClick = (e) => {
+  const r = e.currentTarget.getBoundingClientRect();
+  return Math.min(1, Math.max(0, (r.right - e.clientX) / r.width)); // RTL: البداية من اليمين
+};
+
+function useAdhkar() {
+  const [state, setState] = useState({ data: null, error: null, loading: true });
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    setState((s) => ({ ...s, error: null, loading: true }));
+    api("/v1/adhkar", { signal: ctrl.signal })
+      .then((res) => {
+        const list = Array.isArray(res) ? res : [];
+        setState({ data: normalize(list), error: null, loading: false });
+      })
+      .catch((error) => {
+        if (error.name === "AbortError") return;
+        console.error("API error: /v1/adhkar", error);
+        setState({ data: null, error, loading: false });
+      });
+    return () => ctrl.abort();
+  }, [attempt]);
+
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  return { ...state, retry };
 }
 
-export default function AdhkarSection({ onNavigate }) {
-  const prayer = usePrayerTimes();
-  const { data: khatmDuaData, loading: khatmDuaLoading, error: khatmDuaError } = useKhatmDua();
+function PageShell({ children }) {
+  return (
+    <div dir="rtl" className="min-h-screen bg-[#EFF8F3] text-[#063F30]" style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}>
+      <style>{FONTS_CSS}</style>
+      <Navbar />
+      {children}
+    </div>
+  );
+}
 
-  const [categories, setCategories] = useState(FULL_ADHAKAR_DATA);
-  const [selectedSlug, setSelectedSlug] = useState("morning");
-  const [loading, setLoading] = useState(false);
+function SlowHint() {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 6000);
+    return () => clearTimeout(t);
+  }, []);
+  if (!slow) return null;
+  return <p className="mt-2 text-xs text-[#063F30]/60"> أول تحميل ممكن ياخد لحد دقيقة</p>;
+}
 
+export default function AdhkarSection() {
+  const { data, error, loading, retry } = useAdhkar();
+  const categories = data || [];
+
+  const [selectedSlug, setSelectedSlug] = useState(null);
   const [activeItemIndex, setActiveItemIndex] = useState(0);
   const [itemCounter, setItemCounter] = useState(0);
   const [filter, setFilter] = useState("all");
+  const [liked, setLiked] = useState(false);
+  const [storeTick, setStoreTick] = useState(0);
+  const [queueOpen, setQueueOpen] = useState(false);
 
-  const [tasbihCards, setTasbihCards] = useState(DEFAULT_TASBIH_CARDS);
-  const [customCounters, setCustomCounters] = useState({
-    subhanAllah: 0,
-    astaghfirullah: 0,
-    laHawla: 0,
-    salawat: 0,
-  });
+  const [customCards, setCustomCards] = useState([]);
+  const [counters, setCounters] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newCardText, setNewCardText] = useState("");
   const [newCardTarget, setNewCardTarget] = useState(100);
   const [newCardLabel, setNewCardLabel] = useState("");
 
-  const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef(null);
   const sessionRef = useRef(null);
   const advanceTimer = useRef(null);
+  useEffect(() => () => clearTimeout(advanceTimer.current), []);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function fetchAdhkar() {
-      try {
-        const response = await api("/v1/adhkar");
-        const list = Array.isArray(response) ? response : (response?.data || []);
-        if (list.length > 0 && isMounted) {
-          const merged = FULL_ADHAKAR_DATA.map(localCat => {
-            const apiMatch = list.find(c => c.slug === localCat.slug);
-            return apiMatch ? { ...localCat, items: apiMatch.items || localCat.items } : localCat;
-          });
-          setCategories(merged);
-        }
-      } catch (err) {
-        // Fallback to FULL_ADHAKAR_DATA
-      }
-    }
-    fetchAdhkar();
-    return () => {
-      isMounted = false;
-      clearTimeout(advanceTimer.current);
-    };
-  }, []);
-
-  const selectedCategory = categories.find((c) => c.slug === selectedSlug) || categories[0] || null;
+  const selectedCategory =
+    categories.find((c) => c.slug === selectedSlug) ||
+    categories.find((c) => c.slug === "morning") ||
+    categories[0] ||
+    null;
+  const activeSlug = selectedCategory?.slug;
   const activeItems = selectedCategory?.items || [];
   const activeItem = activeItems[activeItemIndex] || activeItems[0] || null;
-
-  const currentMeta = CAT_META[selectedCategory?.slug] || CAT_META["morning"];
+  const currentUi = CATEGORY_UI[activeSlug] || DEFAULT_UI;
+  const currentMeta = CAT_META[activeSlug] || DEFAULT_META;
+  const HeroIcon = currentMeta.Icon;
 
   const repeat = activeItem?.repeatCount || 1;
   const remaining = Math.max(0, repeat - itemCounter);
-
-  const currentAudioSource = activeItem?.audioUrl || "https://server8.mp3quran.net/afs/001.mp3";
-
-  const doneCount = activeItemIndex + (itemCounter >= repeat ? 1 : 0);
+  // المنجز = الأذكار اللي خلصت فعلاً (نفس المحفوظ اللي بيقراه كارت الرئيسية)
+  const doneCount = useMemo(
+    () => Math.min(storeDoneCount(loadProgress(), activeSlug), activeItems.length),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeSlug, activeItems.length, storeTick],
+  );
   const progressPercent = activeItems.length > 0 ? Math.round((doneCount / activeItems.length) * 100) : 0;
+
+  /* ───── الصوت ───── */
+  const { tracks: recTracks, reciter } = useRecitations();
+  const reciterName = reciter?.startsWith("الشيخ") ? reciter : `الشيخ ${reciter}`;
+
+  const audioTracks = useMemo(() => {
+    if (!selectedCategory) return [];
+    // 1) لو الباك رجّع audioUrl للقسم يبقى هو المصدر
+    if (selectedCategory.audioUrl) {
+      return [{ id: `cat-${activeSlug}`, title: selectedCategory.nameArabic, url: selectedCategory.audioUrl }];
+    }
+    // 2) غير كده: تلاوة الشيخ لسور الورد من /v1/recitations
+    const ids = WIRD_AUDIO_SURAHS[activeSlug];
+    if (!ids) return [];
+    if (!recTracks) return null; // لسه بيتحمّل
+    const byId = new Map(recTracks.map((t) => [t.id, t]));
+    return ids
+      .map((id) => byId.get(id))
+      .filter(Boolean)
+      .map((t) => ({ id: t.id, title: t.title, url: t.audioUrl }));
+  }, [selectedCategory, activeSlug, recTracks]);
+
+  const audioStatus = audioTracks === null ? "loading" : audioTracks.length ? "ready" : "none";
+  const audio = useWirdAudio(audioTracks || [], activeSlug);
+  const audioReady = audioStatus === "ready";
+
+  const audioSubtitle = audio.error
+    ? "تعذّر تشغيل الصوت، جرّب مرة أخرى"
+    : audioStatus === "none"
+    ? "لا يوجد تسجيل صوتي لهذا الباب بعد"
+    : audioStatus === "loading"
+    ? "جاري تحميل التسجيل..."
+    : `تلاوة هادئة ومحفوفة بالتجويد • ${audio.duration ? fmt(audio.duration) : "--:--"} د`;
 
   const goTo = (i) => {
     clearTimeout(advanceTimer.current);
@@ -945,7 +230,10 @@ export default function AdhkarSection({ onNavigate }) {
     if (!activeItem || itemCounter >= repeat) return;
     const next = itemCounter + 1;
     setItemCounter(next);
-    if (next >= repeat) markDone(selectedSlug, activeItemIndex);
+    if (next >= repeat) {
+      markDone(activeSlug, activeItemIndex);
+      setStoreTick((t) => t + 1);
+    }
     if (next >= repeat && activeItemIndex + 1 < activeItems.length) {
       advanceTimer.current = setTimeout(() => {
         setActiveItemIndex((p) => p + 1);
@@ -954,38 +242,24 @@ export default function AdhkarSection({ onNavigate }) {
     }
   };
 
-  const handleCustomTasbihIncrement = (id) => {
-    setCustomCounters((prev) => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
+  const handleTasbihIncrement = (id) => {
+    setCounters((prev) => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
   };
 
   const handleCreateCustomCard = (e) => {
     e.preventDefault();
     if (!newCardText.trim()) return;
-
-    const newId = `custom_${Date.now()}`;
     const newCard = {
-      id: newId,
+      id: `custom_${Date.now()}`,
       text: `«${newCardText.trim()}»`,
       target: Number(newCardTarget) || 100,
       label: newCardLabel.trim() || "ورد خاص",
       dotColor: "#063F30",
     };
-
-    setTasbihCards((prev) => [...prev, newCard]);
-    setCustomCounters((prev) => ({ ...prev, [newId]: 0 }));
+    setCustomCards((prev) => [...prev, newCard]);
     setNewCardText("");
     setNewCardLabel("");
     setIsModalOpen(false);
-  };
-
-  const togglePlayAudio = () => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current.play().then(() => setIsPlaying(true)).catch((err) => console.error("Audio error:", err));
-    }
   };
 
   const selectCategory = (slug) => {
@@ -996,35 +270,69 @@ export default function AdhkarSection({ onNavigate }) {
     sessionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  /* ───── حالات التحميل / الخطأ / الفراغ ───── */
   if (loading) {
     return (
-      <div dir="rtl" className="min-h-screen bg-[#EFF8F3]" style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}>
-        <style>{FONTS_CSS}</style>
-        <HomeHeader prayer={prayer} onNavigate={onNavigate} />
+      <PageShell>
         <div className="flex flex-col items-center justify-center pt-32 text-[#063F30]">
-          <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-[#063F30] border-t-transparent"></div>
+          <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-[#063F30] border-t-transparent" />
           <p className="text-sm font-bold">جاري تحميل الأذكار والأدعية من السيرفر...</p>
+          <SlowHint />
         </div>
-      </div>
+      </PageShell>
+    );
+  }
+
+  if (error) {
+    return (
+      <PageShell>
+        <div className="flex flex-col items-center justify-center px-6 pt-32 text-center">
+          <span className="mb-4 grid h-14 w-14 place-items-center rounded-full bg-[#FFE9C2] text-[#7A5A14]">
+            <AlertTriangle size={26} />
+          </span>
+          <p className="text-base font-bold">تعذّر تحميل الأذكار</p>
+          <p className="mt-1 text-xs text-[#063F30]/65">اتأكد من الاتصال بالإنترنت وجرّب تاني.</p>
+          <button
+            onClick={retry}
+            className="mt-5 flex items-center gap-2 rounded-xl bg-[#063F30] px-6 py-3 text-xs font-bold text-white shadow transition hover:bg-[#084e3c]"
+          >
+            <RotateCw size={14} /> إعادة المحاولة
+          </button>
+        </div>
+      </PageShell>
+    );
+  }
+
+  if (categories.length === 0) {
+    return (
+      <PageShell>
+        <div className="flex flex-col items-center justify-center pt-32 text-center">
+          <p className="text-base font-bold">لا توجد أذكار متاحة حاليًا</p>
+          <button
+            onClick={retry}
+            className="mt-5 flex items-center gap-2 rounded-xl bg-[#063F30] px-6 py-3 text-xs font-bold text-white shadow transition hover:bg-[#084e3c]"
+          >
+            <RotateCw size={14} /> تحديث
+          </button>
+        </div>
+      </PageShell>
     );
   }
 
   const visibleCategories = categories.filter((cat) => {
-    const meta = CAT_META[cat.slug];
     if (filter === "all") return true;
-    return meta && meta.group === filter;
+    return (CAT_META[cat.slug] || DEFAULT_META).group === filter;
   });
+
+  const tasbihCards = [...buildTasbihCards(categories), ...customCards];
+  const progressFraction = audio.duration ? Math.min(1, audio.current / audio.duration) : 0;
 
   return (
     <div dir="rtl" className="min-h-screen bg-[#EFF8F3] pb-44 text-[#063F30]" style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}>
       <style>{FONTS_CSS}</style>
-      <HomeHeader prayer={prayer} onNavigate={onNavigate} />
+      <Navbar />
 
-      <audio
-        ref={audioRef}
-        src={currentAudioSource}
-        onEnded={() => setIsPlaying(false)}
-      />
+      <audio {...audio.audioProps} />
 
       <Wrap className="pb-2 pt-6">
         <div className="mb-3 flex items-center gap-1.5 text-xs text-[#063F30]/60">
@@ -1067,105 +375,109 @@ export default function AdhkarSection({ onNavigate }) {
       </Wrap>
 
       {/* الهيرو الرئيسي */}
-      <Wrap className="my-4">
-        <div
-          className="relative flex min-h-[620px] flex-col justify-between overflow-hidden rounded-xl border border-[#063F30]/40 bg-cover bg-center p-6 shadow-xl md:p-8"
-          style={{ backgroundImage: `linear-gradient(to bottom, rgba(6, 63, 48, 0.4), rgba(6, 63, 48, 0.85)), url('/background.jpg')` }}
-        >
-          <div className="z-10 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="flex items-center gap-1.5 rounded-full bg-[#FFDEA4] px-4 py-1.5 text-xs font-bold text-[#063F30] shadow-sm">
-                <Sun size={13} /> {selectedCategory?.nameArabic || "أذكار الصباح"}
-              </span>
-              <span className="flex items-center gap-1.5 rounded-full border border-white/15 bg-[#0D2018]/60 px-3.5 py-1.5 text-[11px] text-white/90 backdrop-blur-md">
-                <Clock size={12} /> الوقت المستحب: {currentMeta.when}
-              </span>
-            </div>
-            <span className="flex items-center gap-1.5 rounded-full border border-white/15 bg-[#0D2018]/60 px-4 py-1.5 text-[11px] font-bold text-white/90 backdrop-blur-md">
-              <Repeat size={12} /> التكرار المطلوب: {times(repeat)} | التقدم: {itemCounter} / {repeat}
-            </span>
-          </div>
-
-          <div className="z-10 my-6">
-            <div className="flex w-full items-center justify-between gap-4 rounded-2xl border border-white/20 bg-[#152E23]/65 p-3 shadow-xl backdrop-blur-lg">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={togglePlayAudio}
-                  aria-label="تشغيل"
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/30 bg-[#0D2018]/70 text-white shadow-md transition hover:scale-105 active:scale-95"
-                >
-                  {isPlaying ? <Pause size={18} fill="white" /> : <Play size={18} fill="white" className="mr-0.5" />}
-                </button>
-                <div>
-                  <h4 className="text-xs font-bold text-white md:text-sm">الاستماع بصوت الشيخ عبد الرحمن الزواوي</h4>
-                  <p className="text-[11px] text-white/70">تلاوة خاشعة ومحفوفة بالتجويد • 02:45 د</p>
-                </div>
-                <div className="mr-4 hidden items-center gap-[3px] sm:flex">
-                  {WAVE.map((h, i) => (
-                    <span
-                      key={i}
-                      className={`w-[3px] rounded-full bg-[#FFDEA4]/80 ${isPlaying ? "animate-pulse" : ""}`}
-                      style={{ height: h + 4, animationDelay: `${i * 70}ms` }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <button
-                onClick={togglePlayAudio}
-                className="flex items-center gap-2 whitespace-nowrap rounded-xl bg-[#8C6A1C] px-5 py-2.5 text-xs font-bold text-[#FFF1D0] shadow transition hover:bg-[#9a7420]"
-              >
-                <BookOpen size={14} /> {isPlaying ? "إيقاف مؤقت" : "ابدأ الورد الآن"}
-              </button>
-            </div>
-          </div>
-
-          <div className="z-10 grid grid-cols-1 items-end gap-6 md:grid-cols-12">
-            <div className="space-y-5 md:col-span-8">
-              <p className="text-2xl leading-[2] tracking-wide text-white drop-shadow-md md:text-[44px]" style={QURAN}>
-                «{activeItem?.textArabic || "أَصْبَحْنَا وَأَصْبَحَ المُلْكُ لِلَّهِ..."}»
-              </p>
+      {activeItem && (
+        <Wrap className="my-4">
+          <div
+            className="relative flex min-h-[620px] flex-col justify-between overflow-hidden rounded-xl border border-[#063F30]/40 bg-cover bg-center p-6 shadow-xl md:min-h-[820px] md:p-8"
+            style={{ backgroundImage: `linear-gradient(to bottom, rgba(6, 63, 48, 0.4), rgba(6, 63, 48, 0.85)), url('/background.jpg')` }}
+          >
+            <div className="z-10 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="flex items-center gap-1.5 rounded-full border border-white/15 bg-[#0D2018]/60 px-3.5 py-1.5 text-xs text-white/90 backdrop-blur-md">
-                  <CheckCircle2 size={13} className="text-[#FFDEA4]" /> حديث صحيح
+                <span className="flex items-center gap-1.5 rounded-full bg-[#FFDEA4] px-4 py-1.5 text-xs font-bold text-[#063F30] shadow-sm">
+                  <HeroIcon size={13} /> {selectedCategory.nameArabic}
                 </span>
-                {activeItem?.reference && (
-                  <span className="flex items-center gap-1.5 rounded-full border border-white/15 bg-[#0D2018]/60 px-3.5 py-1.5 text-xs text-white/90 backdrop-blur-md">
-                    <ScrollText size={13} className="text-[#FFDEA4]" /> المصدر: {activeItem.reference}
-                  </span>
-                )}
+                <span className="flex items-center gap-1.5 rounded-full border border-white/15 bg-[#0D2018]/60 px-3.5 py-1.5 text-[11px] text-white/90 backdrop-blur-md">
+                  <Clock size={12} /> الوقت المستحب: {currentUi.when}
+                </span>
               </div>
+              <span className="flex items-center gap-2 rounded-full border border-white/15 bg-[#0D2018]/60 px-4 py-1.5 text-[11px] font-bold text-white/90 backdrop-blur-md">
+                التكرار المطلوب: {times(repeat)}
+                <span className="h-1.5 w-1.5 rounded-full bg-[#FFDEA4]" />
+                التقدم: {itemCounter} / {repeat}
+              </span>
             </div>
 
-            <div className="flex justify-end md:col-span-4">
-              <div className="w-full max-w-[300px] rounded-2xl border border-white/20 bg-[#0D2018]/60 p-5 text-center shadow-2xl backdrop-blur-md">
-                <span className="mb-3 block text-[11px] font-bold text-white/70">مؤشر تكرار الذكر</span>
-
-                <div className="relative mx-auto my-1 flex h-28 w-28 items-center justify-center">
-                  <svg className="h-28 w-28 -rotate-90" viewBox="0 0 80 80">
-                    <circle cx="40" cy="40" r="32" stroke="rgba(255,255,255,0.2)" strokeWidth="6" fill="transparent" />
-                    <circle
-                      cx="40" cy="40" r="32" stroke="#FFDEA4" strokeWidth="6" fill="transparent" strokeLinecap="round"
-                      strokeDasharray="201.06"
-                      strokeDashoffset={201.06 - 201.06 * Math.min(1, itemCounter / repeat)}
-                      className="transition-all duration-300"
-                    />
-                  </svg>
-                  <div className="absolute flex flex-col items-center">
-                    <span className="text-2xl font-bold text-white">{itemCounter} / {repeat}</span>
-                    <span className="text-[10px] text-white/60">مكتمل</span>
+            {/* كارت الاستماع */}
+            <div className="z-10 my-6">
+              <div className={`flex w-full items-center justify-between gap-4 rounded-2xl border border-white/20 bg-[#152E23]/65 p-3 shadow-xl backdrop-blur-lg ${audioStatus === "none" ? "opacity-70" : ""}`}>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={audio.toggle}
+                    disabled={!audioReady}
+                    aria-label={audio.isPlaying ? "إيقاف مؤقت" : "تشغيل"}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF1D0] text-[#063F30] shadow-md transition hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
+                  >
+                    {audio.isPlaying ? <Pause size={18} fill="#063F30" /> : <Play size={18} fill="#063F30" className="mr-0.5" />}
+                  </button>
+                  <div>
+                    <h4 className="text-xs font-bold text-white md:text-sm">الاستماع بصوت {reciterName}</h4>
+                    <p className="text-[11px] text-white/70">{audioSubtitle}</p>
+                  </div>
+                  <div className="mr-4 hidden items-center gap-[3px] sm:flex">
+                    {WAVE.map((h, i) => (
+                      <span
+                        key={i}
+                        className={`w-[3px] rounded-full bg-[#FFDEA4]/80 ${audio.isPlaying ? "animate-pulse" : ""}`}
+                        style={{ height: h + 4, animationDelay: `${i * 70}ms` }}
+                      />
+                    ))}
                   </div>
                 </div>
 
-                <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2 text-[11px] text-white/70">
-                  <span>المتبقي: {times(remaining)}</span>
-                  <span>{Math.round((itemCounter / repeat) * 100)}% منجَز</span>
+                <button
+                  onClick={audio.toggle}
+                  disabled={!audioReady}
+                  className="flex items-center gap-2 whitespace-nowrap rounded-xl bg-[#8C6A1C] px-5 py-2.5 text-xs font-bold text-[#FFF1D0] shadow transition hover:bg-[#9a7420] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#8C6A1C]"
+                >
+                  <BookOpen size={14} /> {audio.isPlaying ? "إيقاف مؤقت" : "ابدأ الورد الآن"}
+                </button>
+              </div>
+            </div>
+
+            <div className="z-10 grid grid-cols-1 items-end gap-6 md:grid-cols-12">
+              <div className="space-y-5 md:col-span-8">
+                <p className="whitespace-pre-line text-2xl leading-[2] tracking-wide text-white drop-shadow-md md:text-[44px]" style={QURAN}>
+                  «{activeItem.textArabic}»
+                </p>
+                {activeItem.reference && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="flex items-center gap-1.5 rounded-full border border-white/15 bg-[#0D2018]/60 px-3.5 py-1.5 text-xs text-white/90 backdrop-blur-md">
+                      <ScrollText size={13} className="text-[#FFDEA4]" /> المصدر: {activeItem.reference}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end md:col-span-4">
+                <div className="w-full max-w-[300px] rounded-2xl border border-white/20 bg-[#0D2018]/60 p-5 text-center shadow-2xl backdrop-blur-md">
+                  <span className="mb-3 block text-[11px] font-bold text-white/70">مؤشر تكرار الذكر</span>
+
+                  <div className="relative mx-auto my-1 flex h-28 w-28 items-center justify-center">
+                    <svg className="h-28 w-28 -rotate-90" viewBox="0 0 80 80">
+                      <circle cx="40" cy="40" r="32" stroke="rgba(255,255,255,0.2)" strokeWidth="6" fill="transparent" />
+                      <circle
+                        cx="40" cy="40" r="32" stroke="#FFDEA4" strokeWidth="6" fill="transparent" strokeLinecap="round"
+                        strokeDasharray="201.06"
+                        strokeDashoffset={201.06 - 201.06 * Math.min(1, itemCounter / repeat)}
+                        className="transition-all duration-300"
+                      />
+                    </svg>
+                    <div className="absolute flex flex-col items-center">
+                      <span className="text-2xl font-bold text-white">{itemCounter} / {repeat}</span>
+                      <span className="text-[10px] text-white/60">مكتمل</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2 text-[11px] text-white/70">
+                    <span>المتبقي: {times(remaining)}</span>
+                    <span>{Math.round((itemCounter / repeat) * 100)}% منجَز</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </Wrap>
+        </Wrap>
+      )}
 
       {/* جلسة الذكر التفاعلية */}
       <Wrap className="my-10">
@@ -1181,7 +493,7 @@ export default function AdhkarSection({ onNavigate }) {
               aria-label="السابق"
               className="grid h-10 w-10 place-items-center rounded-xl bg-[#E3EEE8] text-[#063F30] transition hover:bg-[#d4e6dc] disabled:opacity-40"
             >
-              <ChevronLeft size={16} />
+              <ChevronRight size={16} />
             </button>
             <span className="rounded-full bg-[#E3EEE8] px-4 py-1.5 text-xs font-bold text-[#063F30]">
               {activeItems.length > 0 ? activeItemIndex + 1 : 0} من {activeItems.length}
@@ -1192,7 +504,7 @@ export default function AdhkarSection({ onNavigate }) {
               aria-label="التالي"
               className="grid h-10 w-10 place-items-center rounded-xl bg-[#E3EEE8] text-[#063F30] transition hover:bg-[#d4e6dc] disabled:opacity-40"
             >
-              <ChevronRight size={16} />
+              <ChevronLeft size={16} />
             </button>
           </div>
         </div>
@@ -1203,14 +515,14 @@ export default function AdhkarSection({ onNavigate }) {
               <div>
                 <div className="mb-5 flex items-center justify-between border-b border-[#E3EEE8] pb-5">
                   <span className="rounded-full bg-[#E3EEE8] px-4 py-1.5 text-xs font-bold text-[#063F30]">
-                    الذكر {ORDINALS[activeItemIndex] || `رقم ${activeItemIndex + 1}`} — {selectedCategory?.nameArabic}
+                    الذكر {ORDINALS[activeItemIndex] || `رقم ${activeItemIndex + 1}`} • {selectedCategory.nameArabic}
                   </span>
                   <button onClick={() => setItemCounter(0)} className="flex items-center gap-1.5 text-xs text-[#063F30]/70 hover:text-[#063F30]">
                     <RotateCw size={13} /> إعادة ضبط
                   </button>
                 </div>
 
-                <p className="my-8 text-3xl leading-[2] text-[#063F30] md:text-5xl whitespace-pre-line" style={QURAN}>
+                <p className="my-8 whitespace-pre-line text-3xl leading-[2] text-[#063F30] md:text-5xl" style={QURAN}>
                   «{activeItem.textArabic}»
                 </p>
 
@@ -1266,7 +578,7 @@ export default function AdhkarSection({ onNavigate }) {
         )}
       </Wrap>
 
-      {/* أبواب الأذكار المفهرسة ديناميكياً */}
+      {/* أبواب الأذكار */}
       <Wrap className="my-12">
         <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
@@ -1295,10 +607,13 @@ export default function AdhkarSection({ onNavigate }) {
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {visibleCategories.map((cat) => {
-            const meta = CAT_META[cat.slug] || CAT_META["morning"];
-            const CardIcon = meta.Icon || Sun;
-            const isSelected = selectedSlug === cat.slug;
-            const dark = isSelected || meta.featured;
+            const meta = CAT_META[cat.slug] || DEFAULT_META;
+            const ui = CATEGORY_UI[cat.slug] || DEFAULT_UI;
+            const CardIcon = meta.Icon;
+            const isSelected = activeSlug === cat.slug;
+            const dark = isSelected || ui.featured;
+            const count = cat.items?.length || 0;
+            const body = ui.desc || cat.items?.[0]?.textArabic || "";
 
             return (
               <div
@@ -1306,7 +621,7 @@ export default function AdhkarSection({ onNavigate }) {
                 className={`flex flex-col justify-between rounded-2xl border p-6 shadow-sm transition hover:shadow-md ${
                   isSelected
                     ? "border-[#D9C79F] bg-gradient-to-br from-white via-[#FFF8E8] to-[#FFEFD0]"
-                    : meta.featured
+                    : ui.featured
                     ? "border-[#CFE0D6] bg-gradient-to-br from-[#E3F1EA] to-white"
                     : "border-[#DCEAE2] bg-white"
                 }`}
@@ -1316,19 +631,19 @@ export default function AdhkarSection({ onNavigate }) {
                     <div className={`grid h-10 w-10 place-items-center rounded-xl ${ICON_TONE[meta.iconTone]}`}>
                       <CardIcon size={18} />
                     </div>
-                    <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${meta.tagTone === "gold" ? "bg-[#FFE9C2] text-[#7A5A14]" : "bg-[#E3EEE8] text-[#063F30]"}`}>
-                      {meta.tag}
-                    </span>
+                    {ui.tag && (
+                      <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${ui.tagTone === "gold" ? "bg-[#FFE9C2] text-[#7A5A14]" : "bg-[#E3EEE8] text-[#063F30]"}`}>
+                        {ui.tag}
+                      </span>
+                    )}
                   </div>
 
                   <h3 className="text-xl font-bold text-[#063F30]">{cat.nameArabic}</h3>
-                  <p className="mt-2 text-xs leading-6 text-[#063F30]/75">
-                    {cat.items?.length || 0} أذكار مأثورة ومصنفة من السنّة النبوية والقرآن الكريم.
-                  </p>
+                  <p className="mt-2 line-clamp-3 text-xs leading-6 text-[#063F30]/75">{body}</p>
                 </div>
 
                 <div className="mt-6 flex items-center justify-between border-t border-[#E3EEE8] pt-4">
-                  <span className="text-[11px] font-bold text-[#063F30]/60">{cat.items?.length || 0} ذكراً مأثوراً</span>
+                  <span className="text-[11px] font-bold text-[#063F30]/60">{count} {ui.unit}</span>
                   <button
                     onClick={() => selectCategory(cat.slug)}
                     className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition ${
@@ -1360,50 +675,58 @@ export default function AdhkarSection({ onNavigate }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {tasbihCards.map((card) => {
-              const currentVal = customCounters[card.id] || 0;
-              return (
-                <div
-                  key={card.id}
-                  className="flex flex-col justify-between rounded-xl border border-[#E3EEE8] bg-[#F4F9F6] p-5 transition hover:shadow-md"
-                >
-                  <div className="mb-6 flex items-center justify-between">
-                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-bold text-[#063F30] shadow-sm">
-                      {card.target} مرة
-                    </span>
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: card.dotColor }}
-                    />
-                  </div>
+          {tasbihCards.length > 0 && (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {tasbihCards.map((card) => {
+                const currentVal = counters[card.id] || 0;
+                return (
+                  <div
+                    key={card.id}
+                    className="flex flex-col justify-between rounded-xl border border-[#E3EEE8] bg-[#F4F9F6] p-5 transition hover:shadow-md"
+                  >
+                    <div className="mb-6 flex items-center justify-between">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: card.dotColor }} />
+                      <span className="rounded-full bg-white px-3 py-1 text-[11px] font-bold text-[#063F30] shadow-sm">
+                        {card.target} مرة
+                      </span>
+                    </div>
 
-                  <p className="my-4 text-center text-xl font-bold leading-relaxed text-[#063F30]" style={QURAN}>
-                    {card.text}
-                  </p>
+                    <p className="my-4 text-center text-xl font-bold leading-relaxed text-[#063F30]" style={QURAN}>
+                      {card.text}
+                    </p>
 
-                  <div className="mt-4 flex items-center justify-between border-t border-[#E3EEE8] pt-4">
-                    <button
-                      onClick={() => handleCustomTasbihIncrement(card.id)}
-                      aria-label="تسبيح"
-                      className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#063F30] text-white shadow transition hover:bg-[#084e3c] active:scale-95"
-                    >
-                      <Plus size={18} />
-                    </button>
-                    <div className="text-left">
-                      <span className="block text-[10px] font-semibold text-[#063F30]/60">{card.label}</span>
-                      <span className="text-xs font-bold text-[#7A5A14]">{currentVal} / {card.target}</span>
+                    <div className="mt-4 flex items-center justify-between border-t border-[#E3EEE8] pt-4">
+                      <div>
+                        {card.label && (
+                          <span className="block max-w-[140px] truncate text-[10px] font-semibold text-[#063F30]/60" title={card.label}>
+                            {card.label}
+                          </span>
+                        )}
+                        <span className="text-xs font-bold text-[#7A5A14]">{currentVal} / {card.target}</span>
+                      </div>
+                      <button
+                        onClick={() => handleTasbihIncrement(card.id)}
+                        aria-label="تسبيح"
+                        className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#063F30] text-white shadow transition hover:bg-[#084e3c] active:scale-95"
+                      >
+                        <Plus size={18} />
+                      </button>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
 
           <div className="mt-8 flex flex-col items-center justify-between gap-4 rounded-xl border border-[#DCEAE2] bg-[#EAF4EF] p-6 sm:flex-row">
-            <div>
-              <h4 className="text-base font-bold text-[#063F30]">هل تريد تخصيص ورد أو ذكر معين؟</h4>
-              <p className="mt-1 text-xs text-[#063F30]/75">أنشئ عدادك الخاص بالعدد المفضل، واضبط التنبيه اليومي المناسب</p>
+            <div className="flex items-center gap-4">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-[#063F30] shadow-sm">
+                <ListPlus size={18} />
+              </span>
+              <div>
+                <h4 className="text-base font-bold text-[#063F30]">هل تريد تخصيص ورد أو ذكر معين؟</h4>
+                <p className="mt-1 text-xs text-[#063F30]/75">أنشئ عدادك الخاص بالعدد المفضل، واضبط التنبيه اليومي المناسب</p>
+              </div>
             </div>
             <button
               onClick={() => setIsModalOpen(true)}
@@ -1418,58 +741,110 @@ export default function AdhkarSection({ onNavigate }) {
 
       {/* مشغل الصوت السفلي الثابت */}
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#DCEAE2] bg-[#F7FCF9]/95 px-6 py-3 shadow-2xl backdrop-blur-md">
+        {queueOpen && audio.count > 0 && (
+          <div className="absolute bottom-full left-6 mb-2 w-72 rounded-2xl border border-[#DCEAE2] bg-white p-2 shadow-2xl">
+            <p className="px-3 py-2 text-[11px] font-bold text-[#063F30]/60">قائمة التشغيل</p>
+            {audioTracks.map((t, i) => (
+              <button
+                key={t.id}
+                onClick={() => audio.selectTrack(i)}
+                className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-bold transition hover:bg-[#E3EEE8] ${
+                  i === audio.index ? "bg-[#E3EEE8] text-[#063F30]" : "text-[#063F30]/80"
+                }`}
+              >
+                <span>{t.title}</span>
+                {i === audio.index && audio.isPlaying && <Volume2 size={13} className="text-[#7A5A14]" />}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#063F30] text-white shadow">
               <Volume2 size={22} />
             </div>
             <div>
-              <h4 className="text-xs font-bold text-[#063F30]">أذكار الصباح كاملة ومباركة</h4>
-              <p className="text-[11px] text-[#063F30]/70">الشيخ عبد الرحمن الزواوي</p>
+              <h4 className="text-xs font-bold text-[#063F30]">{selectedCategory?.nameArabic}</h4>
+              <p className="text-[11px] text-[#063F30]/70">
+                {audio.count > 1 && audio.track ? `${audio.track.title} • ` : ""}{reciterName}
+              </p>
             </div>
-            <button aria-label="إعجاب" className="mr-2 text-[#063F30]/60 hover:text-[#063F30]">
-              <Heart size={16} />
+            <button
+              onClick={() => setLiked((v) => !v)}
+              aria-label="إعجاب"
+              className={`mr-2 transition ${liked ? "text-[#C0392B]" : "text-[#063F30]/60 hover:text-[#063F30]"}`}
+            >
+              <Heart size={16} fill={liked ? "currentColor" : "none"} />
             </button>
           </div>
 
-          <div className="hidden flex-1 flex-col items-center max-w-xl md:flex">
-            <div className="flex items-center gap-5">
-              <button aria-label="تخطي للوراء" className="text-[#063F30]/70 hover:text-[#063F30]"><RotateCcw size={16} /></button>
-              <button aria-label="السابق" className="text-[#063F30]/70 hover:text-[#063F30]"><SkipBack size={18} /></button>
+          <div className="hidden max-w-xl flex-1 flex-col items-center md:flex">
+            <div dir="ltr" className="flex items-center gap-5">
+              <button onClick={() => audio.skip(-10)} disabled={!audioReady} aria-label="رجوع 10 ثوان" className="text-[#063F30]/70 hover:text-[#063F30] disabled:opacity-40"><RotateCcw size={16} /></button>
+              <button onClick={audio.prev} disabled={!audioReady} aria-label="السابق" className="text-[#063F30]/70 hover:text-[#063F30] disabled:opacity-40"><SkipBack size={18} /></button>
               <button
-                onClick={togglePlayAudio}
+                onClick={audio.toggle}
+                disabled={!audioReady}
                 aria-label="تشغيل أو إيقاف"
-                className="grid h-10 w-10 place-items-center rounded-full bg-[#063F30] text-white shadow hover:scale-105 active:scale-95"
+                className="grid h-10 w-10 place-items-center rounded-full bg-[#063F30] text-white shadow hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
               >
-                {isPlaying ? <Pause size={18} /> : <Play size={18} className="mr-0.5" />}
+                {audio.isPlaying ? <Pause size={18} /> : <Play size={18} className="ml-0.5" />}
               </button>
-              <button aria-label="التالي" className="text-[#063F30]/70 hover:text-[#063F30]"><SkipForward size={18} /></button>
-              <button aria-label="تخطي للأمام" className="text-[#063F30]/70 hover:text-[#063F30]"><RotateCcw size={16} className="-scale-x-100" /></button>
+              <button onClick={audio.next} disabled={!audioReady} aria-label="التالي" className="text-[#063F30]/70 hover:text-[#063F30] disabled:opacity-40"><SkipForward size={18} /></button>
+              <button onClick={() => audio.skip(10)} disabled={!audioReady} aria-label="تقديم 10 ثوان" className="text-[#063F30]/70 hover:text-[#063F30] disabled:opacity-40"><RotateCw size={16} /></button>
             </div>
 
             <div className="mt-2 flex w-full items-center gap-3 text-[11px] text-[#063F30]/70">
-              <span>03:45</span>
-              <div className="relative h-1.5 flex-1 cursor-pointer overflow-hidden rounded-full bg-[#DCEAE2]">
-                <div className="absolute h-full w-[35%] bg-[#063F30] rounded-full"></div>
+              <span className="w-10 text-center tabular-nums">{fmt(audio.current)}</span>
+              <div
+                onClick={(e) => audioReady && audio.seek(fractionFromClick(e))}
+                className="relative h-1.5 flex-1 cursor-pointer overflow-hidden rounded-full bg-[#DCEAE2]"
+              >
+                <div className="absolute h-full rounded-full bg-[#063F30]" style={{ width: `${progressFraction * 100}%` }} />
               </div>
-              <span>18:20</span>
+              <span className="w-10 text-center tabular-nums">{fmt(audio.duration)}</span>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <Volume2 size={16} className="text-[#063F30]/70" />
-            <div className="hidden h-1.5 w-24 cursor-pointer overflow-hidden rounded-full bg-[#DCEAE2] sm:block">
-              <div className="h-full w-[75%] bg-[#063F30]"></div>
+            <button
+              onClick={audio.cycleRate}
+              disabled={!audioReady}
+              aria-label="سرعة التشغيل"
+              className="rounded-lg bg-[#E3EEE8] px-2.5 py-1 text-[10px] font-bold text-[#063F30] disabled:opacity-50"
+            >
+              {audio.rate === 1 ? "1.0" : audio.rate}x
+            </button>
+            <button
+              onClick={() => audio.setVolume(audio.volume > 0 ? 0 : 0.75)}
+              aria-label="الصوت"
+              className="text-[#063F30]/70 hover:text-[#063F30]"
+            >
+              {audio.volume > 0 ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            </button>
+            <div
+              onClick={(e) => audio.setVolume(fractionFromClick(e))}
+              className="hidden h-1.5 w-24 cursor-pointer overflow-hidden rounded-full bg-[#DCEAE2] sm:block"
+            >
+              <div className="h-full bg-[#063F30]" style={{ width: `${audio.volume * 100}%` }} />
             </div>
-            <span className="rounded-lg bg-[#E3EEE8] px-2.5 py-1 text-[10px] font-bold text-[#063F30]">1.0x</span>
+            <button
+              onClick={() => setQueueOpen((v) => !v)}
+              disabled={audio.count === 0}
+              aria-label="قائمة التشغيل"
+              className="text-[#063F30]/70 hover:text-[#063F30] disabled:opacity-40"
+            >
+              <ListMusic size={16} />
+            </button>
           </div>
         </div>
       </div>
 
       {/* نافذة إنشاء العداد المخصص (Modal) */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl md:p-8 animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl md:p-8">
             <div className="flex items-center justify-between border-b border-[#E3EEE8] pb-4">
               <h3 className="text-xl font-bold text-[#063F30]">إنشاء عداد ذكر مخصص</h3>
               <button
@@ -1483,7 +858,7 @@ export default function AdhkarSection({ onNavigate }) {
 
             <form onSubmit={handleCreateCustomCard} className="mt-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[#063F30] mb-2">نص الذكر أو الدعاء:</label>
+                <label className="mb-2 block text-xs font-bold text-[#063F30]">نص الذكر أو الدعاء:</label>
                 <textarea
                   rows={3}
                   required
@@ -1497,7 +872,7 @@ export default function AdhkarSection({ onNavigate }) {
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-bold text-[#063F30] mb-2">العدد المستهدف للتسبيح:</label>
+                  <label className="mb-2 block text-xs font-bold text-[#063F30]">العدد المستهدف للتسبيح:</label>
                   <input
                     type="number"
                     min="1"
@@ -1509,7 +884,7 @@ export default function AdhkarSection({ onNavigate }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#063F30] mb-2">وسم العداد (التصنيف):</label>
+                  <label className="mb-2 block text-xs font-bold text-[#063F30]">وسم العداد (التصنيف):</label>
                   <input
                     type="text"
                     value={newCardLabel}

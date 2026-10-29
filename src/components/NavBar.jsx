@@ -15,7 +15,8 @@ const Navbar = () => {
   const isAdhkar =
     location.pathname.startsWith('/adhkar') ||
     location.pathname.startsWith('/azkar');
-
+  const isQuran = location.pathname.startsWith('/quran');
+  const isShorts = location.pathname.startsWith('/shorts');
   const prayer = usePrayerTimes(); // null لحد ما البيانات توصل
   const [searchQuery, setSearchQuery] = useState('');
   const imgRef = useRef(null);
@@ -98,12 +99,16 @@ const Navbar = () => {
               الرئيسية
             </Link>
 
-            <a
-              href="/#quran"
-              className="px-2.5 sm:px-3 py-2 hover:text-[#1b4332] hover:bg-[#e2ece9]/70 transition-colors rounded-lg whitespace-nowrap"
-            >
-              القرآن الكريم
-            </a>
+            <Link
+  to="/quran"
+  className={`${
+    isQuran
+      ? 'bg-[#1b4332] text-white font-bold shadow-sm'
+      : 'text-gray-700 hover:text-[#1b4332] hover:bg-[#e2ece9]/70'
+  } px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap`}
+>
+  القرآن الكريم
+</Link>
 
             <a
               href="/ahadith"
@@ -130,12 +135,16 @@ const Navbar = () => {
               التفاسير
             </a>
 
-            <a
-              href="/#speeches"
-              className="px-2.5 sm:px-3 py-2 hover:text-[#1b4332] hover:bg-[#e2ece9]/70 transition-colors rounded-lg whitespace-nowrap"
-            >
-              خطب ومرئيات
-            </a>
+           <Link
+                to="/shorts"
+           className={`${
+    isShorts
+      ? 'bg-[#1b4332] text-white font-bold shadow-sm'
+      : 'text-gray-700 hover:text-[#1b4332] hover:bg-[#e2ece9]/70'
+  } px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap`}
+>
+  خطب ومرئيات
+      </Link>
           </nav>
 
           {/* مواقيت الصلاة والبحث والأيقونات */}
