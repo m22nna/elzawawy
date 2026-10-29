@@ -16,6 +16,7 @@ const Navbar = () => {
     location.pathname.startsWith('/adhkar') ||
     location.pathname.startsWith('/azkar');
   const isQuran = location.pathname.startsWith('/quran');
+  const isTafseer = location.pathname.startsWith('/tafseer') || location.pathname.startsWith('/tafsir');
   const isAhadith =
     location.pathname.startsWith('/ahadith') ||
     location.pathname.startsWith('/tafseerhadith');
@@ -103,15 +104,15 @@ const Navbar = () => {
             </Link>
 
             <Link
-  to="/quran"
-  className={`${
-    isQuran
-      ? 'bg-[#1b4332] text-white font-bold shadow-sm'
-      : 'text-gray-700 hover:text-[#1b4332] hover:bg-[#e2ece9]/70'
-  } px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap`}
->
-  القرآن الكريم
-</Link>
+              to="/quran"
+              className={`${
+                isQuran
+                  ? 'bg-[#1b4332] text-white font-bold shadow-sm'
+                  : 'text-gray-700 hover:text-[#1b4332] hover:bg-[#e2ece9]/70'
+              } px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap`}
+            >
+              القرآن الكريم
+            </Link>
 
             <Link
               to="/ahadith"
@@ -135,23 +136,27 @@ const Navbar = () => {
               الأذكار
             </Link>
 
-            <a
-              href="/#tafsir"
-              className="px-2.5 sm:px-3 py-2 hover:text-[#1b4332] hover:bg-[#e2ece9]/70 transition-colors rounded-lg whitespace-nowrap"
+            <Link
+              to="/tafseer"
+              className={`${
+                isTafseer
+                  ? 'bg-[#1b4332] text-white font-bold shadow-sm'
+                  : 'text-gray-700 hover:text-[#1b4332] hover:bg-[#e2ece9]/70'
+              } px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap`}
             >
               التفاسير
-            </a>
+            </Link>
 
-           <Link
-                to="/shorts"
-           className={`${
-    isShorts
-      ? 'bg-[#1b4332] text-white font-bold shadow-sm'
-      : 'text-gray-700 hover:text-[#1b4332] hover:bg-[#e2ece9]/70'
-  } px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap`}
->
-  خطب ومرئيات
-      </Link>
+            <Link
+              to="/shorts"
+              className={`${
+                isShorts
+                  ? 'bg-[#1b4332] text-white font-bold shadow-sm'
+                  : 'text-gray-700 hover:text-[#1b4332] hover:bg-[#e2ece9]/70'
+              } px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap`}
+            >
+              خطب ومرئيات
+            </Link>
           </nav>
 
           {/* مواقيت الصلاة والبحث والأيقونات */}

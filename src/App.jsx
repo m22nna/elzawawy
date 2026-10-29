@@ -2,15 +2,16 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from
 import { useEffect } from "react";
 import { HomePage } from "./features/Home/HomePage";
 import AdhkarSection from "./features/Home/AdhkarSection";
-
-import DownloadsPage from "./features/Downloads/DownloadsPage";
-import QuranPage from "./features/Quran/QuranPage";
-import ShortsPage from "./features/Shorts/ShortsPage";
-
-
 import PrayerTimesPage from './components/PrayerTimesPage';
 import AhadithHomePage from "./components/Ahadees/AhadithHomePage";
 import TafseerHomePage from "./components/TafseerAhadith/TafseerHomePage";
+import RamadanPage from './features/ramadan/RamadanPage';
+import TafseerPage from './features/tafseer/TafseerPage';
+import QuranPage from "./features/Quran/QuranPage";
+import ShortsPage from "./features/Shorts/ShortsPage";
+import DownloadsPage from "./features/Downloads/DownloadsPage";
+import { AudioProvider } from './context/AudioContext';
+import AudioPlayer from './components/AudioPlayer';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -29,6 +30,10 @@ function HashRedirect() {
     const hash = window.location.hash.replace(/^#\/?/, "").toLowerCase();
     if (hash === "adhkar" || hash === "azkar") {
       navigate("/adhkar", { replace: true });
+    } else if (hash === "tafsir" || hash === "tafseer") {
+      navigate("/tafseer", { replace: true });
+    } else if (hash === "ramadan") {
+      navigate("/ramadan", { replace: true });
     }
   }, [navigate]);
 
@@ -37,24 +42,32 @@ function HashRedirect() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <ScrollToTop />
-      <HashRedirect />
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/home" element={<Navigate to="/" replace />} />
-        <Route path="/adhkar" element={<AdhkarSection />} />
-        <Route path="/downloads" element={<DownloadsPage />} />
-        <Route path="/quran/*" element={<QuranPage />} />
-        <Route path="/shorts" element={<ShortsPage />} />
-        <Route path="/azkar" element={<Navigate to="/adhkar" replace />} />
-        <Route path="/prayers" element={<PrayerTimesPage />} />
-        <Route path="/ahadith" element={<AhadithHomePage />} />
-        <Route path="/tafseerhadith/:order?" element={<TafseerHomePage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <AudioProvider>
+      <BrowserRouter>
+        <ScrollToTop />
+        <HashRedirect />
+        <div className="min-h-screen flex flex-col pb-36 md:pb-40">
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/home" element={<Navigate to="/" replace />} />
+            <Route path="/adhkar" element={<AdhkarSection />} />
+            <Route path="/azkar" element={<Navigate to="/adhkar" replace />} />
+            <Route path="/prayers" element={<PrayerTimesPage />} />
+            <Route path="/ahadith" element={<AhadithHomePage />} />
+            <Route path="/tafseerhadith/:order?" element={<TafseerHomePage />} />
+            <Route path="/tafseerhadith" element={<TafseerHomePage />} />
+            <Route path="/ramadan" element={<RamadanPage />} />
+            <Route path="/tafseer" element={<TafseerPage />} />
+            <Route path="/tafsir" element={<Navigate to="/tafseer" replace />} />
+            <Route path="/quran" element={<QuranPage />} />
+            <Route path="/quran/*" element={<QuranPage />} />
+            <Route path="/shorts" element={<ShortsPage />} />
+            <Route path="/downloads" element={<DownloadsPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
+        <AudioPlayer />
+      </BrowserRouter>
+    </AudioProvider>
   );
-
 }
-

@@ -42,7 +42,7 @@ const QUICK_LINKS = [
   {
     title: "تفسير وعلوم القرآن",
     subtitle: "دروس ومقالات",
-    href: "#tafsir",
+    href: "/tafseer",
     Icon: ScrollText,
     iconColor: "#087c78",
     bg: "#eefbf8",
@@ -82,7 +82,7 @@ const QUICK_LINKS = [
   {
     title: "رمضان 2026",
     subtitle: "تلاوات وختمات",
-    href: "#ramadan",
+    href: "/ramadan",
     Icon: Moon,
     iconColor: "#3d36c8",
     bg: "#eef1ff",
