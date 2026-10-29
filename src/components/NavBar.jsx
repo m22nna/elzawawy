@@ -16,6 +16,9 @@ const Navbar = () => {
     location.pathname.startsWith('/adhkar') ||
     location.pathname.startsWith('/azkar');
   const isQuran = location.pathname.startsWith('/quran');
+  const isAhadith =
+    location.pathname.startsWith('/ahadith') ||
+    location.pathname.startsWith('/tafseerhadith');
   const isShorts = location.pathname.startsWith('/shorts');
   const prayer = usePrayerTimes(); // null لحد ما البيانات توصل
   const [searchQuery, setSearchQuery] = useState('');
@@ -110,12 +113,16 @@ const Navbar = () => {
   القرآن الكريم
 </Link>
 
-            <a
-              href="/ahadith"
-              className="px-2.5 sm:px-3 py-2 hover:text-[#1b4332] hover:bg-[#e2ece9]/70 transition-colors rounded-lg whitespace-nowrap"
+            <Link
+              to="/ahadith"
+              className={`${
+                isAhadith
+                  ? 'bg-[#1b4332] text-white font-bold shadow-sm'
+                  : 'text-gray-700 hover:text-[#1b4332] hover:bg-[#e2ece9]/70'
+              } px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap`}
             >
               الأحاديث
-            </a>
+            </Link>
 
             <Link
               to="/adhkar"

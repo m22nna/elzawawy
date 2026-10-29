@@ -212,12 +212,7 @@ const QuickDashboard = () => {
             <button
               type="button"
               onClick={() => {
-                if (hadith) {
-                  try {
-                    sessionStorage.setItem('currentHadith', JSON.stringify(hadith));
-                  } catch (e) {}
-                }
-                navigator('/tafseerhadith', { state: { hadith } });
+                navigator(hadith?.sortOrder ? `/tafseerhadith/${hadith.sortOrder}` : '/tafseerhadith');
               }}
               className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#f0dfc8] bg-white text-xs font-extrabold text-[#073c30] transition-colors hover:bg-[#fffaf2] xl:h-11 xl:text-sm cursor-pointer"
             >

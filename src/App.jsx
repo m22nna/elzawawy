@@ -50,7 +50,7 @@ export default function App() {
         <Route path="/azkar" element={<Navigate to="/adhkar" replace />} />
         <Route path="/prayers" element={<PrayerTimesPage />} />
         <Route path="/ahadith" element={<AhadithHomePage />} />
-        <Route path="/tafseerhadith" element={<TafseerHomePage />} />
+        <Route path="/tafseerhadith/:order?" element={<TafseerHomePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
