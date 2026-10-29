@@ -1,137 +1,162 @@
 import React, { useState } from 'react';
-import {
+import { Check, Copy, FastForward, Heart, Mic, Pause, Play, Repeat, RotateCcw, Rewind, Volume2, VolumeX } from 'lucide-react';
+import { mmss } from '../../features/Quran/utils';
+import { SPEEDS } from './useHadithSpeech';
 
-  Play,
-  Pause,
-  RotateCcw,
-  RotateCw,
-  Volume2,
-  VolumeX,
-  Download,
-  Heart,
-  Mic
-} from 'lucide-react';
+const rateLabel = (r) => `${Number.isInteger(r) ? r.toFixed(1) : r}x`;
 
-const HadithVoiceBar = ({ hadith }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isLiked, setIsLiked] = useState(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState('1.0x');
-  const [volume, setVolume] = useState(80);
-  const [isMuted, setIsMuted] = useState(false);
+// شريط القراءة الآلية للحديث (بصوت المتصفح، مش تسجيل للشيخ)
+const HadithVoiceBar = ({ hadith, speech, saved, onToggleSaved, onStep, hasPrev = true, hasNext = true }) => {
+  const [copied, setCopied] = useState(false);
+  const nextSpeed = () => speech.setRate(SPEEDS[(SPEEDS.indexOf(speech.rate) + 1) % SPEEDS.length]);
+  const muted = speech.volume === 0;
+  const reading = !!hadith && speech.playing && speech.current === hadith.textArabic;
+  const fraction = reading ? speech.progress : 0;
 
-  const speeds = ['0.8x', '1.0x', '1.25x', '1.5x', '2.0x'];
-
-  const toggleSpeed = () => {
-    const currentIndex = speeds.indexOf(playbackSpeed);
-    const nextIndex = (currentIndex + 1) % speeds.length;
-    setPlaybackSpeed(speeds[nextIndex]);
+  const copy = async () => {
+    if (!hadith) return;
+    try {
+      await navigator.clipboard.writeText(`«${hadith.textArabic}»\nالمصدر: ${hadith.source}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* الحافظة غير متاحة */
+    }
   };
 
-  return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#EAE5DD] shadow-lg py-3 px-4 md:px-8 text-[#2C3E35] z-50 font-sans" dir="rtl">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+  const small = 'w-8 h-8 grid place-items-center rounded-full text-[#9A9388] hover:text-[#1E3E30] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed';
 
-        {/* Right Section: Hadith Info */}
-        <div className="flex items-center gap-3 w-full md:w-auto justify-start">
-          <div className="w-10 h-10 rounded-xl bg-[#1E3E30] flex items-center justify-center text-white shrink-0">
+  return (
+    <div
+      className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#EAE5DD] shadow-[0_-4px_20px_rgba(0,0,0,0.06)] py-3 px-4 md:px-8 text-[#2C3E35] z-50 font-sans"
+      dir="rtl"
+      style={{ fontFamily: "'Tajawal', sans-serif" }}
+    >
+      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-[1fr_minmax(320px,520px)_1fr] items-center gap-x-6 gap-y-3">
+
+        {/* يمين: معلومات الحديث */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-11 h-11 rounded-xl bg-[#1E3E30] flex items-center justify-center text-[#E3C878] shrink-0">
             <Mic className="w-5 h-5" />
           </div>
 
-          <div className="text-right">
-            <h4 className="text-sm font-bold text-[#1E3E30] truncate max-w-[250px] sm:max-w-[320px]">
-              {hadith?.textArabic ? `حديث: ${hadith.textArabic}` : 'حديث: فضل طلب العلم والمسارعة إليه...'}
+          <div className="text-right min-w-0">
+            <h4 className="text-sm font-extrabold text-[#1E3E30] truncate max-w-[240px] sm:max-w-[300px]">
+              {hadith ? `حديث: ${hadith.textArabic}` : 'جاري تحميل الحديث...'}
             </h4>
-            <p className="text-[11px] text-[#7A7368]">
-              {hadith?.source ? `${hadith.source} • ` : ''}الشيخ عبدالرحمن الزواوي • <span className="text-[#0D7D4D]">تسجيل استوديو</span>
+            <p className="text-[11px] text-[#7A7368] truncate max-w-[240px] sm:max-w-[300px]">
+              {hadith?.source ? `${hadith.source} • ` : ''}
+              {speech.available ? (
+                <span className="text-[#0D7D4D] font-semibold">قراءة آلية من المتصفح</span>
+              ) : (
+                <span>القراءة الصوتية غير متاحة في متصفحك</span>
+              )}
             </p>
           </div>
 
           <button
-            onClick={() => setIsLiked(!isLiked)}
-            className="mr-2 text-[#A59F94] hover:text-[#C29B38] transition-colors"
+            onClick={() => hadith && onToggleSaved(hadith.sortOrder)}
+            disabled={!hadith}
+            aria-label={saved ? 'إزالة من المحفوظات' : 'حفظ الحديث'}
+            aria-pressed={saved}
+            className="mr-1 text-[#A59F94] hover:text-[#C29B38] transition-colors cursor-pointer"
           >
-            <Heart className={`w-4 h-4 ${isLiked ? 'fill-[#C29B38] text-[#C29B38]' : ''}`} />
+            <Heart className={`w-4 h-4 ${saved ? 'fill-[#C29B38] text-[#C29B38]' : ''}`} />
           </button>
         </div>
 
-        {/* Center Section: Audio Player Controls & Progress */}
-        <div className="flex items-center gap-3 w-full md:w-1/2 max-w-xl justify-center">
-          <span className="text-[11px] text-[#8A8378] font-mono w-9 text-left">00:45</span>
-
-          {/* Player Main Buttons */}
-          <div className="flex items-center gap-2">
-            <button className="text-[#8A8378] hover:text-[#1E3E30] p-1 transition-colors">
+        {/* وسط: التحكم والتقدّم */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-center gap-3" dir="ltr">
+            <button
+              onClick={() => hadith && speech.restart(hadith.textArabic)}
+              disabled={!hadith || !speech.available}
+              aria-label="إعادة القراءة من البداية"
+              title="إعادة القراءة من البداية"
+              className={small}
+            >
               <RotateCcw className="w-4 h-4" />
             </button>
-
+            <button onClick={() => onStep?.(1)} disabled={!hasNext || !hadith} aria-label="الحديث التالي" title="الحديث التالي" className={small}>
+              <FastForward className="w-4 h-4" fill="currentColor" />
+            </button>
             <button
-              onClick={() => setIsPlaying(!isPlaying)}
-              className="w-10 h-10 rounded-full bg-[#F7F5F0] border border-[#E0D9CE] hover:bg-[#EAE4D9] flex items-center justify-center text-[#1E3E30] transition-all shadow-2xs"
+              onClick={() => hadith && speech.toggle(hadith.textArabic)}
+              disabled={!hadith || !speech.available}
+              aria-label={reading ? 'إيقاف' : 'استمع'}
+              className="w-10 h-10 rounded-full bg-[#1E3E30] hover:bg-[#152D23] text-white flex items-center justify-center shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isPlaying ? (
-                <Pause className="w-5 h-5 fill-current" />
-              ) : (
-                <Play className="w-5 h-5 fill-current mr-0.5" />
-              )}
+              {reading ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
             </button>
-
-            <button className="text-[#8A8378] hover:text-[#1E3E30] p-1 transition-colors">
-              <RotateCw className="w-4 h-4" />
+            <button onClick={() => onStep?.(-1)} disabled={!hasPrev || !hadith} aria-label="الحديث السابق" title="الحديث السابق" className={small}>
+              <Rewind className="w-4 h-4" fill="currentColor" />
+            </button>
+            <button
+              onClick={() => speech.setLoop(!speech.loop)}
+              aria-label="تكرار القراءة"
+              aria-pressed={speech.loop}
+              title={speech.loop ? 'إيقاف التكرار' : 'تكرار القراءة'}
+              className={`${small} ${speech.loop ? '!text-[#1E3E30] bg-[#E2ECE7]' : ''}`}
+            >
+              <Repeat className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Progress Bar Container */}
-          <div className="flex-1 bg-[#EAE5DD] h-1.5 rounded-full relative overflow-hidden cursor-pointer">
-            <div className="bg-[#1E3E30] h-full w-[35%] rounded-full relative">
-              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-[#1E3E30] rounded-full shadow-xs"></div>
+          <div className="flex items-center gap-3 text-[10px] text-[#8A8378]">
+            <span className="w-9 tabular-nums">{mmss(reading ? speech.elapsed : 0)}</span>
+            <div className="relative flex-1 h-1 rounded-full bg-[#E6EFE9] overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(fraction * 100)}>
+              <div className="absolute inset-y-0 right-0 rounded-full bg-[#1E3E30] transition-[width] duration-300" style={{ width: `${fraction * 100}%` }} />
             </div>
+            <span className="w-12 text-left tabular-nums" title="مدة تقديرية">
+              {reading ? `≈ ${mmss(speech.estTotal)}` : '--:--'}
+            </span>
           </div>
-
-          <span className="text-[11px] text-[#8A8378] font-mono w-9 text-right">02:18</span>
         </div>
 
-        {/* Left Section: Extras (HQ Tag, Speed, Volume, Download) */}
-        <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-
-          {/* Audio Quality Tag */}
-          <div className="flex items-center gap-1.5 bg-[#F2F7F4] border border-[#D5E5DC] text-[#1E3E30] text-[11px] font-bold px-2.5 py-1 rounded-lg">
-            <span className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse"></span>
-            <span>صوت نقي HQ</span>
-          </div>
-
-          {/* Speed Toggle Button */}
+        {/* شمال: نسخ، الصوت، السرعة، الحالة */}
+        <div className="flex items-center gap-3 justify-start md:justify-end" dir="ltr">
           <button
-            onClick={toggleSpeed}
-            className="border border-[#E2DDD5] bg-[#FAF8F5] hover:bg-[#F0EBE1] text-[#1E3E30] text-xs font-bold px-2.5 py-1 rounded-lg transition-colors"
+            onClick={copy}
+            disabled={!hadith}
+            aria-label="نسخ الحديث"
+            title="نسخ الحديث"
+            className="text-[#9A9388] hover:text-[#1E3E30] transition-colors cursor-pointer disabled:opacity-40"
           >
-            {playbackSpeed}
+            {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
           </button>
 
-          {/* Volume Control */}
           <div className="hidden lg:flex items-center gap-2">
-            <button
-              onClick={() => setIsMuted(!isMuted)}
-              className="text-[#8A8378] hover:text-[#1E3E30]"
-            >
-              {isMuted || volume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-            </button>
             <input
               type="range"
               min="0"
               max="100"
-              value={isMuted ? 0 : volume}
-              onChange={(e) => { setVolume(Number(e.target.value)); setIsMuted(false); }}
-              className="w-16 accent-[#1E3E30] h-1 bg-[#E2DDD5] rounded-lg cursor-pointer"
+              value={Math.round(speech.volume * 100)}
+              onChange={(e) => speech.setVolume(Number(e.target.value) / 100)}
+              aria-label="مستوى الصوت"
+              className="w-20 accent-[#1E3E30] h-1 cursor-pointer"
             />
+            <button
+              onClick={() => speech.setVolume(muted ? 1 : 0)}
+              aria-label={muted ? 'تشغيل الصوت' : 'كتم الصوت'}
+              className="text-[#8A8378] hover:text-[#1E3E30] cursor-pointer"
+            >
+              {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            </button>
           </div>
 
-          {/* Download Button */}
-          <button className="text-[#8A8378] hover:text-[#1E3E30] p-1.5 rounded-lg border border-[#E2DDD5] hover:bg-[#F5F2EC] transition-colors">
-            <Download className="w-4 h-4" />
+          <button
+            onClick={nextSpeed}
+            aria-label="سرعة القراءة"
+            className="border border-[#E2DDD5] bg-white hover:bg-[#F7F5F0] text-[#1E3E30] text-xs font-bold px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+          >
+            {rateLabel(speech.rate)}
           </button>
 
+          <span className="hidden sm:flex items-center gap-1.5 border border-[#E2DDD5] bg-[#FAF8F5] rounded-xl px-3 py-1.5 text-[10px] font-bold text-[#1E3E30]" dir="rtl">
+            قراءة آلية
+            <span className={`w-1.5 h-1.5 rounded-full ${speech.available ? 'bg-[#10B981]' : 'bg-[#B8B2A7]'}`} />
+          </span>
         </div>
-
       </div>
     </div>
   );
