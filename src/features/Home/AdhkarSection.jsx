@@ -17,9 +17,20 @@ import { Link } from "react-router-dom";
 /* ───────────── Design tokens ───────────── */
 const C = { goldRing: "#C69234" };
 
-const QURAN = { fontFamily: "'Amiri', 'Amiri Quran', serif" };
+// إعدادات موحّدة لعرض النصوص العربية المشكولة بدون تباعد زائد بين الحروف.
+const QURAN = {
+  fontFamily: "'Amiri Quran', 'Amiri', serif",
+  fontWeight: 400,
+  lineHeight: 2.3,
+  letterSpacing: "normal",
+  wordSpacing: "normal",
+  fontKerning: "normal",
+  fontVariantLigatures: "common-ligatures",
+  textRendering: "optimizeLegibility",
+  direction: "rtl",
+};
 const FONTS_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
 `;
 
 const Wrap = ({ className = "", ...p }) => (
@@ -60,6 +71,16 @@ const CAT_META = {
 const DEFAULT_META = { Icon: BookOpen, iconTone: "mint", group: "occasions" };
 
 const TASBIH_SLUG = "tasbih-and-istighfar";
+const SAVED_ADHKAR_KEY = "adhkar:saved:v1";
+
+const readSavedAdhkar = () => {
+  try {
+    const value = JSON.parse(localStorage.getItem(SAVED_ADHKAR_KEY) || "[]");
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+};
 
 const ICON_TONE = {
   brown: "bg-[#7A5A14] text-white",
@@ -151,6 +172,8 @@ export default function AdhkarSection() {
   const [itemCounter, setItemCounter] = useState(0);
   const [filter, setFilter] = useState("all");
   const [liked, setLiked] = useState(false);
+  const [savedItems, setSavedItems] = useState(readSavedAdhkar);
+  const [actionMessage, setActionMessage] = useState("");
   const [storeTick, setStoreTick] = useState(0);
   const [queueOpen, setQueueOpen] = useState(false);
 
@@ -164,6 +187,20 @@ export default function AdhkarSection() {
   const sessionRef = useRef(null);
   const advanceTimer = useRef(null);
   useEffect(() => () => clearTimeout(advanceTimer.current), []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SAVED_ADHKAR_KEY, JSON.stringify(savedItems));
+    } catch (error) {
+      console.error("Could not save adhkar", error);
+    }
+  }, [savedItems]);
+
+  useEffect(() => {
+    if (!actionMessage) return;
+    const timer = setTimeout(() => setActionMessage(""), 2500);
+    return () => clearTimeout(timer);
+  }, [actionMessage]);
 
   const selectedCategory =
     categories.find((c) => c.slug === selectedSlug) ||
@@ -186,6 +223,61 @@ export default function AdhkarSection() {
     [activeSlug, activeItems.length, storeTick],
   );
   const progressPercent = activeItems.length > 0 ? Math.round((doneCount / activeItems.length) * 100) : 0;
+
+  const savedKey = activeItem ? `${activeSlug}:${activeItem.id ?? activeItemIndex}` : "";
+  const isActiveSaved = savedItems.some((item) => item.key === savedKey);
+
+  const toggleSaveActiveItem = () => {
+    if (!activeItem || !savedKey) return;
+    if (isActiveSaved) {
+      setSavedItems((items) => items.filter((item) => item.key !== savedKey));
+      setActionMessage("تمت إزالة الذكر من المحفوظات");
+      return;
+    }
+    setSavedItems((items) => [
+      ...items,
+      {
+        key: savedKey,
+        slug: activeSlug,
+        categoryName: selectedCategory?.nameArabic || "الأذكار",
+        textArabic: activeItem.textArabic,
+        reference: activeItem.reference || "",
+        virtue: activeItem.virtue || "",
+        savedAt: Date.now(),
+      },
+    ]);
+    setActionMessage("تم حفظ الذكر بنجاح");
+  };
+
+  const shareActiveItem = async () => {
+    if (!activeItem) return;
+    const shareText = [
+      `«${activeItem.textArabic}»`,
+      activeItem.reference ? `المصدر: ${activeItem.reference}` : "",
+      "من صفحة الأذكار والأدعية - الزواوي",
+    ].filter(Boolean).join("\n\n");
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "ذكر من الأذكار والأدعية", text: shareText });
+        setActionMessage("تم فتح قائمة المشاركة");
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareText);
+        setActionMessage("تم نسخ الذكر، يمكنك مشاركته الآن");
+      } else {
+        window.prompt("انسخ الذكر لمشاركته:", shareText);
+      }
+    } catch (error) {
+      if (error?.name !== "AbortError") {
+        try {
+          await navigator.clipboard.writeText(shareText);
+          setActionMessage("تم نسخ الذكر، يمكنك مشاركته الآن");
+        } catch {
+          setActionMessage("تعذّرت المشاركة من هذا المتصفح");
+        }
+      }
+    }
+  };
 
   /* ───── الصوت ───── */
   const { tracks: recTracks, reciter } = useRecitations();
@@ -436,7 +528,7 @@ export default function AdhkarSection() {
 
             <div className="z-10 grid grid-cols-1 items-end gap-6 md:grid-cols-12">
               <div className="space-y-5 md:col-span-8">
-                <p className="whitespace-pre-line text-2xl leading-[2] tracking-wide text-white drop-shadow-md md:text-[44px]" style={QURAN}>
+                <p className="whitespace-pre-line text-2xl leading-[2.3] tracking-normal text-white drop-shadow-md md:text-[40px]" style={QURAN}>
                   «{activeItem.textArabic}»
                 </p>
                 {activeItem.reference && (
@@ -522,7 +614,7 @@ export default function AdhkarSection() {
                   </button>
                 </div>
 
-                <p className="my-8 whitespace-pre-line text-3xl leading-[2] text-[#063F30] md:text-5xl" style={QURAN}>
+                <p className="my-8 whitespace-pre-line text-3xl leading-[2.3] tracking-normal text-[#063F30] md:text-4xl" style={QURAN}>
                   «{activeItem.textArabic}»
                 </p>
 
@@ -540,10 +632,20 @@ export default function AdhkarSection() {
               <div className="mt-8 flex items-center justify-between border-t border-[#E3EEE8] pt-6 text-xs text-[#063F30]/70">
                 <span>{activeItem.reference ? `المصدر: ${activeItem.reference}` : ""}</span>
                 <div className="flex items-center gap-2">
-                  <button aria-label="حفظ" className="grid h-11 w-11 place-items-center rounded-xl bg-[#E3EEE8] text-[#063F30] hover:bg-[#d4e6dc]">
-                    <Bookmark size={16} />
+                  <button
+                    onClick={toggleSaveActiveItem}
+                    aria-label={isActiveSaved ? "إزالة من المحفوظات" : "حفظ الذكر"}
+                    title={isActiveSaved ? "إزالة من المحفوظات" : "حفظ الذكر"}
+                    className={`grid h-11 w-11 place-items-center rounded-xl transition hover:bg-[#d4e6dc] ${isActiveSaved ? "bg-[#063F30] text-white" : "bg-[#E3EEE8] text-[#063F30]"}`}
+                  >
+                    <Bookmark size={16} fill={isActiveSaved ? "currentColor" : "none"} />
                   </button>
-                  <button aria-label="مشاركة" className="grid h-11 w-11 place-items-center rounded-xl bg-[#E3EEE8] text-[#063F30] hover:bg-[#d4e6dc]">
+                  <button
+                    onClick={shareActiveItem}
+                    aria-label="مشاركة الذكر"
+                    title="مشاركة الذكر"
+                    className="grid h-11 w-11 place-items-center rounded-xl bg-[#E3EEE8] text-[#063F30] transition hover:bg-[#d4e6dc]"
+                  >
                     <Share2 size={16} />
                   </button>
                 </div>
@@ -691,7 +793,7 @@ export default function AdhkarSection() {
                       </span>
                     </div>
 
-                    <p className="my-4 text-center text-xl font-bold leading-relaxed text-[#063F30]" style={QURAN}>
+                    <p className="my-4 text-center text-xl leading-[2.2] tracking-normal text-[#063F30]" style={QURAN}>
                       {card.text}
                     </p>
 
@@ -840,6 +942,12 @@ export default function AdhkarSection() {
           </div>
         </div>
       </div>
+
+      {actionMessage && (
+        <div role="status" className="fixed bottom-28 left-1/2 z-[80] -translate-x-1/2 rounded-xl bg-[#063F30] px-5 py-3 text-sm font-bold text-white shadow-xl">
+          {actionMessage}
+        </div>
+      )}
 
       {/* نافذة إنشاء العداد المخصص (Modal) */}
       {isModalOpen && (
