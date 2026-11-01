@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { Bookmark, BookmarkCheck, Share2, VideoOff, X } from "lucide-react";
-import { usePlayer } from "../../Quran/player/PlayerProvider";
+import { useAudio } from "../../../context/AudioContext";
 import { timeAgo } from "../utils";
 
 export default function ShortModal({ short, saved, onToggleSaved, onShare, onClose }) {
-  const player = usePlayer();
+  const { pauseTrack } = useAudio();
 
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose();
@@ -43,7 +43,7 @@ export default function ShortModal({ short, saved, onToggleSaved, onShare, onClo
               controls
               autoPlay
               playsInline
-              onPlay={() => player?.pause?.()} // نوقف صوت التلاوة لما الفيديو يشتغل
+              onPlay={() => pauseTrack()} // نوقف صوت التلاوة لما الفيديو يشتغل
               className="h-full w-full object-contain"
             />
           ) : (

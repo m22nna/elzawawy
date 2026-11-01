@@ -58,7 +58,7 @@ const QUICK_LINKS = [
   {
     title: "المحفوظات",
     subtitle: "الصفحات والمقاطع",
-    href: "#bookmarks",
+    href: "/bookmarks",
     Icon: Bookmark,
     iconColor: "#087747",
     bg: "#effcf4",

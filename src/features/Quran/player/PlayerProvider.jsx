@@ -1,98 +1,77 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useMemo } from "react";
+import { useAudio } from "../../../context/AudioContext";
+import { useSurahs } from "../hooks/useQuranData";
+import { surahTitle } from "../utils";
 
 const Ctx = createContext(null);
 export const usePlayer = () => useContext(Ctx);
 
 export function PlayerProvider({ tracks, reciter, children }) {
-  const audio = useRef(null);
-  const tracksRef = useRef(tracks);
-  const idRef = useRef(null);
-  const rateRef = useRef(1);
-  tracksRef.current = tracks;
+  const audio = useAudio();
+  const { surahs } = useSurahs();
+  const { playTrack, pauseTrack, seekFraction, skipForward, skipBackward, setPlaybackRate, setVolume } = audio;
 
-  const [state, setState] = useState({ surahId: null, playing: false, pos: 0, dur: 0, failed: false });
-  const [rate, setRateState] = useState(1);
-  const [volume, setVolumeState] = useState(1);
+  const queue = useMemo(() => {
+    if (!tracks) return [];
+    const byId = new Map((surahs ?? []).map((s) => [s.id, s]));
+    return [...tracks.entries()]
+      .filter(([, t]) => t?.audioUrl)
+      .sort((a, b) => a[0] - b[0])
+      .map(([id, t]) => ({
+        id: `quran-${id}`,
+        surahId: id,
+        title: `${byId.has(id) ? surahTitle(byId.get(id)) : `سورة ${id}`} - تلاوة خاشعة`,
+        reciter,
+        audioUrl: t.audioUrl,
+      }));
+  }, [tracks, surahs, reciter]);
 
-  const load = useCallback((id) => {
-    const a = audio.current;
-    const url = tracksRef.current?.get(id)?.audioUrl;
-    if (!a || !url) return false;
-    idRef.current = id;
-    a.src = url;
-    a.playbackRate = rateRef.current;
-    a.play().catch(() => {});
-    setState({ surahId: id, playing: false, pos: 0, dur: 0, failed: false });
-    return true;
-  }, []);
-
-  useEffect(() => {
-    const a = new Audio();
-    a.preload = "none";
-    audio.current = a;
-    const on = {
-      timeupdate: () => setState((s) => ({ ...s, pos: a.currentTime })),
-      loadedmetadata: () => setState((s) => ({ ...s, dur: a.duration || 0 })),
-      play: () => setState((s) => ({ ...s, playing: true })),
-      pause: () => setState((s) => ({ ...s, playing: false })),
-      error: () => setState((s) => ({ ...s, playing: false, failed: true })),
-      ended: () => {
-        const next = (idRef.current ?? 0) + 1; // بعد ما تخلص تكمّل بالسورة اللي بعدها
-        if (next <= 114 && !load(next)) setState((s) => ({ ...s, playing: false }));
-      },
-    };
-    Object.entries(on).forEach(([e, f]) => a.addEventListener(e, f));
-    return () => {
-      a.pause();
-      Object.entries(on).forEach(([e, f]) => a.removeEventListener(e, f));
-    };
-  }, [load]);
+  const bySurah = useMemo(() => new Map(queue.map((t) => [t.surahId, t])), [queue]);
 
   const toggle = useCallback(
     (id) => {
-      const a = audio.current;
-      if (!a) return;
-      if (id === idRef.current) {
-        if (a.paused) {
-          setState((s) => ({ ...s, failed: false }));
-          a.play().catch(() => {});
-        } else a.pause();
-      } else load(id);
+      const track = bySurah.get(id);
+      if (track) playTrack(track, { queue });
     },
-    [load]
+    [bySurah, queue, playTrack]
   );
 
-  const step = useCallback((id, delta) => load(Math.min(114, Math.max(1, (id ?? 1) + delta))), [load]);
+  const step = useCallback(
+    (id, delta) => {
+      const track = bySurah.get(Math.min(114, Math.max(1, (id ?? 1) + delta)));
+      if (track) playTrack(track, { queue, restart: true });
+    },
+    [bySurah, queue, playTrack]
+  );
 
-  const seek = useCallback((fraction) => {
-    const a = audio.current;
-    if (a?.duration) a.currentTime = fraction * a.duration;
-  }, []);
+  const skipBy = useCallback((seconds) => (seconds >= 0 ? skipForward(seconds) : skipBackward(-seconds)), [skipForward, skipBackward]);
 
-  const skipBy = useCallback((seconds) => {
-    const a = audio.current;
-    if (!a || !a.duration) return;
-    a.currentTime = Math.min(a.duration, Math.max(0, a.currentTime + seconds));
-  }, []);
+  const surahId = audio.currentTrack?.surahId ?? null;
 
-  const setRate = useCallback((r) => {
-    rateRef.current = r;
-    setRateState(r);
-    if (audio.current) audio.current.playbackRate = r;
-  }, []);
+  const value = useMemo(
+    () => ({
+      surahId,
+      playing: surahId != null && audio.isPlaying,
+      pos: surahId != null ? audio.currentTime : 0,
+      dur: surahId != null ? audio.duration : 0,
+      failed: surahId != null && audio.failed,
+      rate: audio.playbackRate,
+      volume: audio.volume,
+      reciter,
+      toggle,
+      pause: pauseTrack,
+      step,
+      seek: seekFraction,
+      skipBy,
+      setRate: setPlaybackRate,
+      setVolume,
+      hasTrack: (id) => bySurah.has(id),
+    }),
+    [
+      surahId, audio.isPlaying, audio.currentTime, audio.duration, audio.failed, audio.playbackRate, audio.volume,
+      reciter, toggle, pauseTrack, step, seekFraction, skipBy, setPlaybackRate, setVolume, bySurah,
+    ]
+  );
 
-  const setVolume = useCallback((v) => {
-    setVolumeState(v);
-    if (audio.current) audio.current.volume = v;
-  }, []);
-
-const pause = useCallback(() => {
-  audio.current?.pause();
-}, []);
-
-const value = useMemo(
-  () => ({ ...state, rate, volume, reciter, toggle, pause, step, seek, setRate, setVolume, hasTrack: (id) => tracks?.has(id) }),
-  [state, rate, volume, reciter, toggle, pause, step, seek, setRate, setVolume, tracks]
-);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

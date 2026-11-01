@@ -6,7 +6,6 @@ import { FILTERS, useDownloads } from "./useDownloads";
 import DownloadsHeader from "./components/DownloadsHeader";
 import DownloadsToolbar from "./components/DownloadsToolbar";
 import DownloadsList from "./components/DownloadsList";
-import MiniPlayer from "./components/MiniPlayer";
 
 function Page() {
   const { items, pause, resume, remove, getUrl } = useDownloads();
@@ -26,7 +25,7 @@ function Page() {
     (i) => (filter === "all" || i.category === filter) && (!query.trim() || i.title.includes(query.trim()))
   );
 
-  // بيشغّل من الملف المحفوظ (offline)، ولو مش موجود يشغّل من الرابط الأصلي
+
   const play = async (item) => {
     if (audio.current?.id === item.id) return audio.toggle(audio.current);
     const audioUrl = (await getUrl(item.id)) ?? item.url;
@@ -50,7 +49,6 @@ function Page() {
           onRemove={remove}
         />
       </Container>
-      <MiniPlayer />
     </div>
   );
 }

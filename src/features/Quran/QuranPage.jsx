@@ -9,7 +9,6 @@ import { PlayerProvider } from "./player/PlayerProvider";
 import QuranHeader from "./components/QuranHeader";
 import ReaderCard from "./components/ReaderCard";
 import SurahIndex from "./components/SurahIndex";
-import PlayerBar from "./components/PlayerBar";
 
 const toInt = (s) => (/^\d+$/.test(s ?? "") ? Number(s) : NaN);
 
@@ -64,8 +63,7 @@ export default function QuranPage() {
     if (!canonical) navigate(`/quran/page/${page}`, { replace: true });
   }, [canonical, page, navigate]);
 
-  // نحفظ مكان القراءة (السورة اللي ظاهرة فوق الصفحة) عشان "متابعة القراءة" في الرئيسية
-  const firstAyah = data.ayahs?.[0];
+
   const saveReading = useCallback(
     (a) => {
       const surah = surahs?.find((s) => s.id === a.surahId);
@@ -86,7 +84,6 @@ export default function QuranPage() {
         <div className="mx-auto w-full max-w-[1400px] px-4 py-8 sm:px-6 lg:px-10">
           <Content page={page} surahs={surahs} data={data} onActive={canonical ? saveReading : undefined} />
         </div>
-        <PlayerBar fallbackId={firstAyah?.surahId ?? 1} surahs={surahs} />
       </div>
     </PlayerProvider>
   );

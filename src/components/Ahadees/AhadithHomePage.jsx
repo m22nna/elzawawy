@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../NavBar";
 import DailyHadith from "./DailyHadith";
 import HadithTopics from "./HadithTopics";
 import HadithFooter from "./HadithFooter";
-import HadithVoiceBar from "./HadithVoiceBar";
 import { useDailyHadith, useHadiths, useSavedHadiths } from "./hadithData";
 import { useHadithSpeech } from "./useHadithSpeech";
 
@@ -22,36 +21,15 @@ export function AhadithHomePage() {
   const speech = useHadithSpeech();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all"); // all | saved | اسم المصدر
-  const [barHadith, setBarHadith] = useState(null); // الحديث اللي ظاهر في شريط الصوت (null = حديث اليوم)
 
-  // لما حديث اليوم يتغيّر نوقف القراءة ونرجّع الشريط لحديث اليوم
-  useEffect(() => {
-    speech.stop();
-    setBarHadith(null);
-  }, [daily.hadith]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openHadith = useCallback(
     (hadith) => navigate(`/tafseerhadith/${hadith.sortOrder}`),
     [navigate]
   );
 
-  // قراءة حديث (من حديث اليوم أو من أي كارت): الشريط السفلي بيعرض الحديث ده
-  const playHadith = (hadith) => {
-    setBarHadith(hadith);
-    speech.toggle(hadith.textArabic);
-  };
 
-  const audioHadith = barHadith ?? daily.hadith;
-  const audioIndex = audioHadith && hadiths ? hadiths.findIndex((h) => h.sortOrder === audioHadith.sortOrder) : -1;
-
-  // الحديث السابق/التالي في المكتبة من الشريط السفلي
-  const stepAudio = (delta) => {
-    const next = hadiths?.[audioIndex + delta];
-    if (!next) return;
-    const wasPlaying = speech.playing;
-    setBarHadith(next);
-    if (wasPlaying) speech.toggle(next.textArabic);
-  };
+  const playHadith = (hadith) => speech.play(hadith, hadiths);
 
   const discover = () => {
     daily.another();
@@ -115,15 +93,6 @@ export function AhadithHomePage() {
         total={total}
         savedCount={savedIds.length}
         onShowSaved={showSaved}
-      />
-      <HadithVoiceBar
-        hadith={audioHadith}
-        speech={speech}
-        saved={audioHadith ? savedIds.includes(audioHadith.sortOrder) : false}
-        onToggleSaved={toggleSaved}
-        onStep={stepAudio}
-        hasPrev={audioIndex > 0}
-        hasNext={audioIndex >= 0 && audioIndex < total - 1}
       />
     </div>
   );

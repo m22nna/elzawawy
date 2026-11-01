@@ -1,7 +1,6 @@
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import Navbar from "../NavBar";
-import HadithVoiceBar from "../Ahadees/HadithVoiceBar";
 import { useDailyHadith, useHadiths, useSavedHadiths } from "../Ahadees/hadithData";
 import { useHadithSpeech } from "../Ahadees/useHadithSpeech";
 import HadithDetails from "./HadithDetailes";
@@ -55,7 +54,7 @@ const TafseerHomePage = () => {
   const prev = index > 0 ? hadiths[index - 1] : null;
   const next = index >= 0 && index < total - 1 ? hadiths[index + 1] : null;
 
-  // أحاديث تانية من المكتبة (التالية في الترتيب) — الباك مفيهوش تصنيف بالموضوع فمش بندّعي إنها "من نفس الباب"
+
   const related = useMemo(() => {
     if (!hadiths || index < 0) return [];
     const out = [];
@@ -65,12 +64,7 @@ const TafseerHomePage = () => {
 
   const open = (h) => navigate(`/tafseerhadith/${h.sortOrder}`);
 
-  // نوقف القراءة الصوتية لما المستخدم ينتقل لحديث تاني
-  useEffect(() => {
-    speech.stop();
-  }, [order]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // بدون رقم في اللينك: نفتح حديث اليوم بلينك ثابت يتشارك ويتحمّل تاني
   if (!order && daily.hadith) return <Navigate to={`/tafseerhadith/${daily.hadith.sortOrder}`} replace />;
 
   let body;
@@ -102,7 +96,7 @@ const TafseerHomePage = () => {
           total={total}
           saved={savedIds.includes(hadith.sortOrder)}
           onToggleSaved={toggleSaved}
-          speech={speech}
+          speech={{ ...speech, play: (h) => speech.play(h, hadiths) }}
         />
         <HadithExplanation hadith={hadith} prev={prev} next={next} onOpen={open} />
         <RelatedAhadith related={related} onOpen={open} />
@@ -114,20 +108,6 @@ const TafseerHomePage = () => {
     <div className="pb-28 bg-[#FAF8F5] text-[#2C3E35] min-h-screen" style={{ fontFamily: "'Tajawal', sans-serif" }}>
       <Navbar />
       {body}
-      {hadith && (
-        <HadithVoiceBar
-          hadith={hadith}
-          speech={speech}
-          saved={savedIds.includes(hadith.sortOrder)}
-          onToggleSaved={toggleSaved}
-          onStep={(delta) => {
-            const target = delta < 0 ? prev : next;
-            if (target) open(target);
-          }}
-          hasPrev={!!prev}
-          hasNext={!!next}
-        />
-      )}
     </div>
   );
 };
