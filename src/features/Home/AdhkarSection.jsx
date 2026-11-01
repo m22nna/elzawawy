@@ -17,7 +17,7 @@ import { Link } from "react-router-dom";
 /* ───────────── Design tokens ───────────── */
 const C = { goldRing: "#C69234" };
 
-// إعدادات موحّدة لعرض النصوص العربية المشكولة بدون تباعد زائد بين الحروف.
+
 const QURAN = {
   fontFamily: "'Amiri Quran', 'Amiri', serif",
   fontWeight: 400,
@@ -840,108 +840,6 @@ export default function AdhkarSection() {
           </div>
         </div>
       </Wrap>
-
-      {/* مشغل الصوت السفلي الثابت */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#DCEAE2] bg-[#F7FCF9]/95 px-6 py-3 shadow-2xl backdrop-blur-md">
-        {queueOpen && audio.count > 0 && (
-          <div className="absolute bottom-full left-6 mb-2 w-72 rounded-2xl border border-[#DCEAE2] bg-white p-2 shadow-2xl">
-            <p className="px-3 py-2 text-[11px] font-bold text-[#063F30]/60">قائمة التشغيل</p>
-            {audioTracks.map((t, i) => (
-              <button
-                key={t.id}
-                onClick={() => audio.selectTrack(i)}
-                className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-bold transition hover:bg-[#E3EEE8] ${
-                  i === audio.index ? "bg-[#E3EEE8] text-[#063F30]" : "text-[#063F30]/80"
-                }`}
-              >
-                <span>{t.title}</span>
-                {i === audio.index && audio.isPlaying && <Volume2 size={13} className="text-[#7A5A14]" />}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#063F30] text-white shadow">
-              <Volume2 size={22} />
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-[#063F30]">{selectedCategory?.nameArabic}</h4>
-              <p className="text-[11px] text-[#063F30]/70">
-                {audio.count > 1 && audio.track ? `${audio.track.title} • ` : ""}{reciterName}
-              </p>
-            </div>
-            <button
-              onClick={() => setLiked((v) => !v)}
-              aria-label="إعجاب"
-              className={`mr-2 transition ${liked ? "text-[#C0392B]" : "text-[#063F30]/60 hover:text-[#063F30]"}`}
-            >
-              <Heart size={16} fill={liked ? "currentColor" : "none"} />
-            </button>
-          </div>
-
-          <div className="hidden max-w-xl flex-1 flex-col items-center md:flex">
-            <div dir="ltr" className="flex items-center gap-5">
-              <button onClick={() => audio.skip(-10)} disabled={!audioReady} aria-label="رجوع 10 ثوان" className="text-[#063F30]/70 hover:text-[#063F30] disabled:opacity-40"><RotateCcw size={16} /></button>
-              <button onClick={audio.prev} disabled={!audioReady} aria-label="السابق" className="text-[#063F30]/70 hover:text-[#063F30] disabled:opacity-40"><SkipBack size={18} /></button>
-              <button
-                onClick={audio.toggle}
-                disabled={!audioReady}
-                aria-label="تشغيل أو إيقاف"
-                className="grid h-10 w-10 place-items-center rounded-full bg-[#063F30] text-white shadow hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-              >
-                {audio.isPlaying ? <Pause size={18} /> : <Play size={18} className="ml-0.5" />}
-              </button>
-              <button onClick={audio.next} disabled={!audioReady} aria-label="التالي" className="text-[#063F30]/70 hover:text-[#063F30] disabled:opacity-40"><SkipForward size={18} /></button>
-              <button onClick={() => audio.skip(10)} disabled={!audioReady} aria-label="تقديم 10 ثوان" className="text-[#063F30]/70 hover:text-[#063F30] disabled:opacity-40"><RotateCw size={16} /></button>
-            </div>
-
-            <div className="mt-2 flex w-full items-center gap-3 text-[11px] text-[#063F30]/70">
-              <span className="w-10 text-center tabular-nums">{fmt(audio.current)}</span>
-              <div
-                onClick={(e) => audioReady && audio.seek(fractionFromClick(e))}
-                className="relative h-1.5 flex-1 cursor-pointer overflow-hidden rounded-full bg-[#DCEAE2]"
-              >
-                <div className="absolute h-full rounded-full bg-[#063F30]" style={{ width: `${progressFraction * 100}%` }} />
-              </div>
-              <span className="w-10 text-center tabular-nums">{fmt(audio.duration)}</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={audio.cycleRate}
-              disabled={!audioReady}
-              aria-label="سرعة التشغيل"
-              className="rounded-lg bg-[#E3EEE8] px-2.5 py-1 text-[10px] font-bold text-[#063F30] disabled:opacity-50"
-            >
-              {audio.rate === 1 ? "1.0" : audio.rate}x
-            </button>
-            <button
-              onClick={() => audio.setVolume(audio.volume > 0 ? 0 : 0.75)}
-              aria-label="الصوت"
-              className="text-[#063F30]/70 hover:text-[#063F30]"
-            >
-              {audio.volume > 0 ? <Volume2 size={16} /> : <VolumeX size={16} />}
-            </button>
-            <div
-              onClick={(e) => audio.setVolume(fractionFromClick(e))}
-              className="hidden h-1.5 w-24 cursor-pointer overflow-hidden rounded-full bg-[#DCEAE2] sm:block"
-            >
-              <div className="h-full bg-[#063F30]" style={{ width: `${audio.volume * 100}%` }} />
-            </div>
-            <button
-              onClick={() => setQueueOpen((v) => !v)}
-              disabled={audio.count === 0}
-              aria-label="قائمة التشغيل"
-              className="text-[#063F30]/70 hover:text-[#063F30] disabled:opacity-40"
-            >
-              <ListMusic size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
 
       {actionMessage && (
         <div role="status" className="fixed bottom-28 left-1/2 z-[80] -translate-x-1/2 rounded-xl bg-[#063F30] px-5 py-3 text-sm font-bold text-white shadow-xl">

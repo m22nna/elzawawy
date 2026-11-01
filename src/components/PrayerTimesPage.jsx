@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import {
   Bell,
   BellOff,
-  Compass,
   Sun,
   Moon,
   Sunrise,
@@ -14,7 +13,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
   ArrowLeft,
   CirclePlay,
   CirclePause,
@@ -23,10 +21,8 @@ import {
   CalendarDays
 } from 'lucide-react';
 import Navbar from './NavBar';
-import { PlayerProvider, usePlayer } from '../features/Quran/player/PlayerProvider';
-import PlayerBar from '../features/Quran/components/PlayerBar';
-import { useSurahs, useTracks } from '../features/Quran/hooks/useQuranData';
-import { MonthModal, PlaceModal, QiblaModal } from './prayer/PrayerModals';
+import { useAudio } from '../context/AudioContext';
+import { MonthModal, PlaceModal } from './prayer/PrayerModals';
 import {
   ADHAN_URL,
   DEFAULT_PLACE,
@@ -36,7 +32,6 @@ import {
   addDays,
   ampm,
   arDigits,
-  compassName,
   computeState,
   dateKey,
   fetchMonth,
@@ -44,8 +39,7 @@ import {
   isValidTz,
   neededMonths,
   period,
-  placeKeyOf,
-  qiblaBearing
+  placeKeyOf
 } from './prayer/prayerUtils';
 
 /* ---------- الألوان ---------- */
@@ -69,6 +63,7 @@ const CARDS = [
 ];
 
 const TAB_OFFSET = { yesterday: -1, today: 0, tomorrow: 1 };
+const ADHAN_TRACK = { id: 'adhan', title: 'نداء الأذان', reciter: 'أذان الحرم المكي', audioUrl: ADHAN_URL };
 const PLACE_KEY = 'zawawy:prayer:place';
 const ADHAN_KEY = 'zawawy:prayer:adhan';
 
@@ -91,9 +86,9 @@ const loadAdhanOn = () => {
 };
 
 function PrayerTimesContent() {
-  const player = usePlayer();
+  const audio = useAudio();
   const [activeTab, setActiveTab] = useState('today');
-  const [modal, setModal] = useState(null); // null | 'place' | 'month' | 'qibla'
+  const [modal, setModal] = useState(null); // null | 'place' | 'month'
   const [methodOpen, setMethodOpen] = useState(true);
   const [place, setPlace] = useState(loadPlace);
   const placeKey = placeKeyOf(place);
@@ -185,9 +180,6 @@ function PrayerTimesContent() {
   const methodName = methodInfo?.name ?? method?.name ?? 'الجهة المعتمدة';
   const placeTitle = `${place.name}${place.countryName ? `، ${place.countryName}` : ''}`;
 
-  /* ---------- القبلة ---------- */
-  const bearing = useMemo(() => qiblaBearing(Number(place.lat), Number(place.lng)), [place]);
-
   /* ---------- حالة كل كارت ---------- */
   const cardState = (key) => {
     if (!isTodayTab) return null;
@@ -205,50 +197,19 @@ function PrayerTimesContent() {
   };
 
   /* ---------- نداء الأذان ---------- */
-  const adhanRef = useRef(null);
   const firedRef = useRef(null);
   const [adhanOn, setAdhanOn] = useState(loadAdhanOn);
-  const [isAdhanPlaying, setIsAdhanPlaying] = useState(false);
-  const [adhanError, setAdhanError] = useState(false);
 
-  const getAdhan = () => {
-    if (!adhanRef.current) {
-      const audio = new Audio(ADHAN_URL);
-      audio.addEventListener('ended', () => setIsAdhanPlaying(false));
-      audio.addEventListener('pause', () => setIsAdhanPlaying(false));
-      audio.addEventListener('error', () => {
-        setIsAdhanPlaying(false);
-        setAdhanError(true);
-      });
-      adhanRef.current = audio;
-    }
-    return adhanRef.current;
-  };
+  // الأذان بيشتغل في شريط الصوت الوحيد (وبيوقف أي تلاوة شغّالة وقتها)
+  const isAdhanCurrent = audio.currentTrack?.id === ADHAN_TRACK.id;
+  const isAdhanPlaying = isAdhanCurrent && audio.isPlaying;
+  const adhanError = isAdhanCurrent && audio.failed;
 
-  useEffect(() => () => adhanRef.current?.pause(), []);
-
-  const playAdhan = () => {
-    if (player?.playing) player.toggle(player.surahId); // نوقف التلاوة وقت الأذان
-    const audio = getAdhan();
-    audio.currentTime = 0;
-    return audio
-      .play()
-      .then(() => {
-        setIsAdhanPlaying(true);
-        setAdhanError(false);
-      })
-      .catch((err) => {
-        console.error('تعذر تشغيل ملف الأذان:', err);
-        setAdhanError(true);
-      });
-  };
+  const playAdhan = () => audio.playTrack(ADHAN_TRACK, { restart: true });
   const playAdhanRef = useRef(playAdhan);
   playAdhanRef.current = playAdhan;
 
-  const toggleAdhanAudio = () => {
-    if (isAdhanPlaying) getAdhan().pause();
-    else playAdhan();
-  };
+  const toggleAdhanAudio = () => audio.playTrack(ADHAN_TRACK); // نفس المقطع = تشغيل/إيقاف
 
   const toggleAdhanOn = () => {
     const nextVal = !adhanOn;
@@ -545,7 +506,7 @@ function PrayerTimesContent() {
       </div>
 
       {/* ============ القسم السفلي ============ */}
-      <div className="max-w-[1320px] mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+      <div className="max-w-[1320px] mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
         {/* اليمين: التبويبات + طريقة الحساب */}
         <div className="lg:col-span-7 space-y-4">
           <div className="bg-white px-3 py-2.5 rounded-2xl border flex items-center justify-between gap-2" style={{ borderColor: C.border }}>
@@ -623,12 +584,12 @@ function PrayerTimesContent() {
         </div>
 
         {/* اليسار: الأذكار + اتجاه القبلة */}
-        <div className="lg:col-span-5 space-y-4">
+        <div className="lg:col-span-5 flex">
           <div
-            className="text-white p-5 rounded-2xl flex flex-col justify-between min-h-[135px]"
+            className="text-white p-5 rounded-2xl flex flex-col justify-between flex-1 min-h-[135px]"
             style={{ backgroundColor: C.greenCard }}
           >
-            <div>
+            <div className="flex flex-1 flex-col">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-[11px] font-bold" style={{ color: '#d6b068' }}>
                   من سنن ما بعد الصلاة المكتوبة
@@ -636,7 +597,7 @@ function PrayerTimesContent() {
                 <Sparkles className="w-4 h-4 text-white/70" />
               </div>
               <p
-                className="text-[15px] sm:text-[17px] leading-[2.1] text-right"
+                className="my-auto text-[15px] sm:text-[17px] leading-[2.1] text-right"
                 style={{ fontFamily: "'Amiri','Scheherazade New',serif", color: '#efe3c3' }}
               >
                 «أَسْتَغْفِرُ اللهَ (ثَلاثَاً)، اللَّهُمَّ أَنْتَ السَّلامُ وَمِنْكَ السَّلامُ، تَبَارَكْتَ يَا ذَا الجَلالِ وَالإِكْرَامِ»
@@ -651,29 +612,6 @@ function PrayerTimesContent() {
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border flex items-center justify-between" style={{ borderColor: C.border }}>
-            <div className="flex items-center gap-3 text-right">
-              <div className="p-2.5 bg-[#f1f0ea] rounded-full" style={{ color: C.green }}>
-                <Compass className="w-4 h-4" />
-              </div>
-              <div>
-                <div className="text-[12px] font-black text-[#0f172a]">
-                  اتجاه القبلة: {Math.round(bearing)}° {compassName(bearing)}
-                </div>
-                <div className="text-[10px] text-slate-500 font-medium">نحو الكعبة المشرفة بمكة المكرمة</div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setModal('qibla')}
-              className="flex items-center gap-1.5 text-[11px] font-bold cursor-pointer hover:opacity-70 transition"
-              style={{ color: C.green }}
-            >
-              <span>البوصلة</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </button>
-          </div>
         </div>
       </div>
 
@@ -681,22 +619,10 @@ function PrayerTimesContent() {
       {modal === 'month' && (
         <MonthModal place={place} todayKey={todayKey} getMonth={getMonth} loadMonth={loadMonth} onClose={() => setModal(null)} />
       )}
-      {modal === 'qibla' && <QiblaModal bearing={bearing} place={place} onClose={() => setModal(null)} />}
     </div>
   );
 }
 
 export default function PrayerTimesPage() {
-  const { tracks, reciter } = useTracks();
-  const { surahs } = useSurahs();
-
-  return (
-    <PlayerProvider tracks={tracks} reciter={reciter}>
-      <PrayerTimesContent />
-
-      <div dir="rtl">
-        <PlayerBar fallbackId={1} surahs={surahs} />
-      </div>
-    </PlayerProvider>
-  );
+  return <PrayerTimesContent />;
 }

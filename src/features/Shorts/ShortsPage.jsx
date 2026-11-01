@@ -3,9 +3,6 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { BookOpen, ChevronDown, CirclePlay, SquarePlay } from "lucide-react";
 import Navbar from "../../components/NavBar";
-import { useSurahs, useTracks } from "../Quran/hooks/useQuranData";
-import { PlayerProvider } from "../Quran/player/PlayerProvider";
-import PlayerBar from "../Quran/components/PlayerBar";
 import { plain } from "../Quran/utils";
 import { useSavedShorts, useShorts } from "./hooks/useShorts";
 import ShortsHeader from "./components/ShortsHeader";
@@ -222,19 +219,14 @@ const share = useCallback(async (s) => {
 }
 
 export default function ShortsPage() {
-  const { tracks, reciter } = useTracks();
-  const { surahs } = useSurahs();
   const data = useShorts();
 
   return (
-    <PlayerProvider tracks={tracks} reciter={reciter}>
-      <div dir="rtl" className="min-h-screen bg-[#F1FAF5] pb-32 font-body">
-        <Navbar />
-        <div className="mx-auto w-full max-w-[1400px] px-4 py-8 sm:px-6 lg:px-10">
-          <Content {...data} />
-        </div>
-        <PlayerBar fallbackId={18} surahs={surahs} />
+    <div dir="rtl" className="min-h-screen bg-[#F1FAF5] pb-32 font-body">
+      <Navbar />
+      <div className="mx-auto w-full max-w-[1400px] px-4 py-8 sm:px-6 lg:px-10">
+        <Content {...data} />
       </div>
-    </PlayerProvider>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Play,
   Pause,
@@ -7,6 +7,7 @@ import {
   Clock
 } from 'lucide-react';
 import { usePrayerTimes } from '../api/usePrayerTimes';
+import { useAudio } from '../context/AudioContext';
 import { Link } from 'react-router-dom';
 
 const PRAYER_ROWS = [
@@ -49,8 +50,9 @@ const Hero = ({ bgImageUrl }) => {
 
   // مشغل التلاوة
   const [recitation, setRecitation] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef(null);
+  const audio = useAudio();
+  const recitationTrackId = recitation ? `quran-${recitation.surahId}` : null;
+  const isPlaying = !!recitationTrackId && audio.currentTrack?.id === recitationTrackId && audio.isPlaying;
 
   // جلب تلاوة سورة الكهف
   useEffect(() => {
@@ -74,30 +76,17 @@ const Hero = ({ bgImageUrl }) => {
     fetchRecitation();
   }, []);
 
-  // تشغيل وإيقاف الصوت
-  const togglePlay = async () => {
+
+  const togglePlay = () => {
     if (!recitation?.audioUrl) return;
 
-    if (!audioRef.current) {
-      audioRef.current = new Audio(recitation.audioUrl);
-
-      audioRef.current.onended = () => setIsPlaying(false);
-
-      audioRef.current.onerror = () => setIsPlaying(false);
-    }
-
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      try {
-        await audioRef.current.play();
-        setIsPlaying(true);
-      } catch (err) {
-        console.error('تعذر تشغيل التلاوة:', err);
-        setIsPlaying(false);
-      }
-    }
+    audio.playTrack({
+      id: recitationTrackId,
+      surahId: Number(recitation.surahId),
+      title: `${recitation.surahName || 'سورة الكهف'} - تلاوة خاشعة`,
+      reciter: 'الشيخ عبدالرحمن الزواوي',
+      audioUrl: recitation.audioUrl,
+    });
   };
 
   // تنسيق مواقيت الصلاة

@@ -9,7 +9,7 @@ const rateLabel = (r) => `${Number.isInteger(r) ? r.toFixed(1) : r}x`;
 const FONT_MIN = 20;
 const FONT_MAX = 40;
 
-// الحقول المتاحة من الباك: textArabic / source / explanation / sortOrder فقط
+
 const HadithDetails = ({ hadith, total, saved, onToggleSaved, speech }) => {
   const navigate = useNavigate();
   const [fontSize, setFontSize] = useState(28);
@@ -29,7 +29,7 @@ const HadithDetails = ({ hadith, total, saved, onToggleSaved, speech }) => {
       await navigator.clipboard.writeText(text);
       flash(set);
     } catch {
-      /* الحافظة غير متاحة */
+
     }
   };
 
@@ -118,7 +118,7 @@ const HadithDetails = ({ hadith, total, saved, onToggleSaved, speech }) => {
 
                 <button
                   type="button"
-                  onClick={() => speech.toggle(hadith.textArabic)}
+                  onClick={() => speech.play(hadith)}
                   disabled={!speech.available}
                   aria-label={reading ? "إيقاف القراءة" : "تشغيل القراءة"}
                   className="w-14 h-14 rounded-full bg-white text-[#1E3E30] hover:scale-105 transition-transform flex items-center justify-center mx-auto shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"

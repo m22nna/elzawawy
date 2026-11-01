@@ -1,130 +1,57 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+// src/components/Ahadees/useHadithSpeech.js — قراءة الأحاديث بصوت المتصفح عبر المشغّل العام
+// مفيش محرّك هنا: ده طبقة رفيعة فوق context/AudioContext، والقراءة بتظهر في شريط الصوت الوحيد وبتكمّل لما المستخدم يتنقل.
+import { useCallback } from "react";
+import { useAudio } from "../../context/AudioContext";
 
-export const SPEEDS = [0.75, 0.85, 1, 1.25];
+export const SPEEDS = [0.75, 1, 1.25, 1.5];
 
-const CHARS_PER_SECOND = 13; // تقدير تقريبي لسرعة القراءة العربية عند سرعة 1x (بنستخدمه للوقت الكلي فقط)
+const snippet = (text, max = 60) => {
+  const s = String(text).replace(/\s+/g, " ").trim();
+  return s.length > max ? `${s.slice(0, max).trimEnd()}…` : s;
+};
 
-const supported = () => typeof window !== "undefined" && "speechSynthesis" in window;
+/** تحويل حديث (من الباك) لمقطع قراءة آلية */
+export const hadithTrack = (h) => ({
+  id: `hadith-${h.sortOrder}`,
+  kind: "speech",
+  text: h.textArabic,
+  title: `حديث: ${snippet(h.textArabic)}`,
+  reciter: h.source ? `${h.source} • قراءة آلية` : "قراءة آلية",
+});
 
 export function useHadithSpeech() {
-  const [hasArabic, setHasArabic] = useState(false);
-  const [playing, setPlaying] = useState(false);
-  const [current, setCurrent] = useState(null); // نص الحديث اللي بيتقرأ دلوقتي
-  const [rate, setRate] = useState(0.85);
-  const [volume, setVolume] = useState(1);
-  const [loop, setLoop] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const [boundary, setBoundary] = useState(0); // نسبة التقدّم من أحداث الكلمات (لو المتصفح بيدعمها)
+  const a = useAudio();
+  const { playTrack, pauseTrack, closePlayer } = a;
+  const isSpeech = a.currentTrack?.kind === "speech";
 
-  const opts = useRef({ rate, volume, loop });
-  opts.current = { rate, volume, loop };
-  const token = useRef(0); // عشان نتجاهل أحداث القراءة القديمة لما نبدّل الحديث
-  const startedAt = useRef(0);
+  // play(hadith, list?) — لو اتبعتت list (أحاديث المكتبة) السابق/التالي في الشريط بيمشوا عليها
+  const play = useCallback(
+    (hadith, list) => {
+      if (hadith) playTrack(hadithTrack(hadith), list ? { queue: list.map(hadithTrack) } : undefined);
+    },
+    [playTrack]
+  );
 
-  useEffect(() => {
-    if (!supported()) return undefined;
-    const synth = window.speechSynthesis;
-    const check = () => setHasArabic(synth.getVoices().some((v) => /^ar/i.test(v.lang)));
-    check();
-    synth.addEventListener?.("voiceschanged", check);
-    return () => {
-      synth.removeEventListener?.("voiceschanged", check);
-      token.current += 1;
-      synth.cancel();
-    };
-  }, []);
-
-  // عدّاد الوقت المنقضي أثناء القراءة
-  useEffect(() => {
-    if (!playing) return undefined;
-    const timer = setInterval(() => setElapsed((Date.now() - startedAt.current) / 1000), 250);
-    return () => clearInterval(timer);
-  }, [playing]);
-
-  const stop = useCallback(() => {
-    token.current += 1;
-    if (supported()) window.speechSynthesis.cancel();
-    setPlaying(false);
-    setCurrent(null);
-    setElapsed(0);
-    setBoundary(0);
-  }, []);
-
-  const speak = useCallback((text) => {
-    if (!supported() || !text) return;
-    const synth = window.speechSynthesis;
-    token.current += 1;
-    const mine = token.current;
-    synth.cancel();
-
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "ar-SA";
-    u.rate = opts.current.rate;
-    u.volume = opts.current.volume;
-    u.onboundary = (e) => {
-      if (mine === token.current && typeof e.charIndex === "number") setBoundary(Math.min(1, e.charIndex / text.length));
-    };
-    u.onend = () => {
-      if (mine !== token.current) return;
-      if (opts.current.loop) {
-        speak(text); // تكرار القراءة
-        return;
-      }
-      setPlaying(false);
-      setCurrent(null);
-      setElapsed(0);
-      setBoundary(0);
-    };
-    u.onerror = (e) => {
-      if (mine !== token.current || e.error === "interrupted" || e.error === "canceled") return;
-      setPlaying(false);
-      setCurrent(null);
-    };
-
-    startedAt.current = Date.now();
-    setElapsed(0);
-    setBoundary(0);
-    setCurrent(text);
-    setPlaying(true);
-    synth.speak(u);
-  }, []);
-
-  // لو نفس الحديث شغّال يوقفه، وإلا يبدأ قراءة الحديث ده (حتى لو في حديث تاني شغّال)
+  // توافق مع الاستدعاء القديم بالنص بس
   const toggle = useCallback(
     (text) => {
-      if (!supported() || !hasArabic || !text) return;
-      if (playing && current === text) stop();
-      else speak(text);
+      if (text) playTrack({ id: `hadith-text-${snippet(text, 24)}`, kind: "speech", text, title: `حديث: ${snippet(text)}`, reciter: "قراءة آلية" });
     },
-    [hasArabic, playing, current, stop, speak]
+    [playTrack]
   );
-
-  const restart = useCallback(
-    (text) => {
-      const t = text ?? current;
-      if (supported() && hasArabic && t) speak(t);
-    },
-    [hasArabic, current, speak]
-  );
-
-  const estTotal = current ? Math.max(2, current.length / (CHARS_PER_SECOND * rate)) : 0;
-  const progress = playing ? Math.min(0.98, Math.max(boundary, elapsed / (estTotal || 1))) : 0;
 
   return {
-    available: supported() && hasArabic,
-    playing,
-    current,
-    progress,
-    elapsed,
-    estTotal,
+    available: a.speechAvailable,
+    playing: isSpeech && a.isPlaying,
+    current: isSpeech ? a.currentTrack.text : null,
+    progress: isSpeech && a.duration ? Math.min(1, a.currentTime / a.duration) : 0,
+    elapsed: isSpeech ? a.currentTime : 0,
+    estTotal: isSpeech ? a.duration : 0,
+    rate: a.playbackRate,
+    setRate: a.setPlaybackRate,
+    play,
     toggle,
-    restart,
-    stop,
-    rate,
-    setRate,
-    volume,
-    setVolume,
-    loop,
-    setLoop,
+    stop: () => isSpeech && pauseTrack(),
+    close: () => isSpeech && closePlayer(),
   };
 }
