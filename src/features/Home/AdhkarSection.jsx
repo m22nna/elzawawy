@@ -1,16 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Bookmark, Sun, Sunset, Moon, Share2, Play, Pause, RotateCw, RotateCcw,
-  Plus, PlusCircle, ChevronRight, ChevronLeft, Volume2, VolumeX,
+  Bookmark, Sun, Sunset, Moon, Share2, RotateCw,
+  Plus, PlusCircle, ChevronRight, ChevronLeft, Volume2,
   BadgeCheck, BookOpen, Clock, Hand, ArrowLeft, Landmark, ScrollText,
-  Infinity as InfinityIcon, SkipForward, SkipBack, Heart, X, ClipboardCheck,
-  AlertTriangle, ListMusic, ListPlus,
+  Infinity as InfinityIcon, X, ClipboardCheck,
+  AlertTriangle, ListPlus,
 } from "lucide-react";
 import { api } from "../../api/client";
-import { useRecitations } from "../../api/useRecitations";
 import { markDone, loadProgress, doneCount as storeDoneCount } from "./wirdStore";
-import { useWirdAudio } from "./useWirdAudio";
-import { CATEGORY_UI, DEFAULT_UI, WIRD_AUDIO_SURAHS } from "../../config/adhkarUi";
+import { CATEGORY_UI, DEFAULT_UI } from "../../config/adhkarUi";
 import Navbar from "../../components/NavBar";
 import { Link } from "react-router-dom";
 
@@ -50,13 +48,6 @@ const ORDINALS = [
   "السابع عشر", "الثامن عشر", "التاسع عشر", "العشرون",
 ];
 
-const fmt = (s) => {
-  if (!Number.isFinite(s) || s <= 0) return "00:00";
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
-};
-
 const CAT_META = {
   morning: { Icon: Sun, iconTone: "brown", group: "daily" },
   evening: { Icon: Sunset, iconTone: "green", group: "daily" },
@@ -89,8 +80,6 @@ const ICON_TONE = {
   cream: "bg-[#FFE9C2] text-[#7A5A14]",
 };
 
-const WAVE = [6, 12, 8, 16, 10, 18, 7, 14, 9, 17, 6, 13, 8, 15, 10, 12, 7, 11];
-
 const bySortOrder = (a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0);
 
 const normalize = (list) =>
@@ -112,11 +101,6 @@ const buildTasbihCards = (categories) => {
     label: it.virtue || "",
     dotColor: i % 2 === 0 ? "#7A5A14" : "#063F30",
   }));
-};
-
-const fractionFromClick = (e) => {
-  const r = e.currentTarget.getBoundingClientRect();
-  return Math.min(1, Math.max(0, (r.right - e.clientX) / r.width)); // RTL: البداية من اليمين
 };
 
 function useAdhkar() {
@@ -171,11 +155,9 @@ export default function AdhkarSection() {
   const [activeItemIndex, setActiveItemIndex] = useState(0);
   const [itemCounter, setItemCounter] = useState(0);
   const [filter, setFilter] = useState("all");
-  const [liked, setLiked] = useState(false);
   const [savedItems, setSavedItems] = useState(readSavedAdhkar);
   const [actionMessage, setActionMessage] = useState("");
   const [storeTick, setStoreTick] = useState(0);
-  const [queueOpen, setQueueOpen] = useState(false);
 
   const [customCards, setCustomCards] = useState([]);
   const [counters, setCounters] = useState({});
@@ -278,39 +260,6 @@ export default function AdhkarSection() {
       }
     }
   };
-
-  /* ───── الصوت ───── */
-  const { tracks: recTracks, reciter } = useRecitations();
-  const reciterName = reciter?.startsWith("الشيخ") ? reciter : `الشيخ ${reciter}`;
-
-  const audioTracks = useMemo(() => {
-    if (!selectedCategory) return [];
-    // 1) لو الباك رجّع audioUrl للقسم يبقى هو المصدر
-    if (selectedCategory.audioUrl) {
-      return [{ id: `cat-${activeSlug}`, title: selectedCategory.nameArabic, url: selectedCategory.audioUrl }];
-    }
-    // 2) غير كده: تلاوة الشيخ لسور الورد من /v1/recitations
-    const ids = WIRD_AUDIO_SURAHS[activeSlug];
-    if (!ids) return [];
-    if (!recTracks) return null; // لسه بيتحمّل
-    const byId = new Map(recTracks.map((t) => [t.id, t]));
-    return ids
-      .map((id) => byId.get(id))
-      .filter(Boolean)
-      .map((t) => ({ id: t.id, title: t.title, url: t.audioUrl }));
-  }, [selectedCategory, activeSlug, recTracks]);
-
-  const audioStatus = audioTracks === null ? "loading" : audioTracks.length ? "ready" : "none";
-  const audio = useWirdAudio(audioTracks || [], activeSlug);
-  const audioReady = audioStatus === "ready";
-
-  const audioSubtitle = audio.error
-    ? "تعذّر تشغيل الصوت، جرّب مرة أخرى"
-    : audioStatus === "none"
-    ? "لا يوجد تسجيل صوتي لهذا الباب بعد"
-    : audioStatus === "loading"
-    ? "جاري تحميل التسجيل..."
-    : `تلاوة هادئة ومحفوفة بالتجويد • ${audio.duration ? fmt(audio.duration) : "--:--"} د`;
 
   const goTo = (i) => {
     clearTimeout(advanceTimer.current);
@@ -417,14 +366,11 @@ export default function AdhkarSection() {
   });
 
   const tasbihCards = [...buildTasbihCards(categories), ...customCards];
-  const progressFraction = audio.duration ? Math.min(1, audio.current / audio.duration) : 0;
 
   return (
     <div dir="rtl" className="min-h-screen bg-[#EFF8F3] pb-44 text-[#063F30]" style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}>
       <style>{FONTS_CSS}</style>
       <Navbar />
-
-      <audio {...audio.audioProps} />
 
       <Wrap className="pb-2 pt-6">
         <div className="mb-3 flex items-center gap-1.5 text-xs text-[#063F30]/60">
@@ -489,44 +435,7 @@ export default function AdhkarSection() {
               </span>
             </div>
 
-            {/* كارت الاستماع */}
-            <div className="z-10 my-6">
-              <div className={`flex w-full items-center justify-between gap-4 rounded-2xl border border-white/20 bg-[#152E23]/65 p-3 shadow-xl backdrop-blur-lg ${audioStatus === "none" ? "opacity-70" : ""}`}>
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={audio.toggle}
-                    disabled={!audioReady}
-                    aria-label={audio.isPlaying ? "إيقاف مؤقت" : "تشغيل"}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF1D0] text-[#063F30] shadow-md transition hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
-                  >
-                    {audio.isPlaying ? <Pause size={18} fill="#063F30" /> : <Play size={18} fill="#063F30" className="mr-0.5" />}
-                  </button>
-                  <div>
-                    <h4 className="text-xs font-bold text-white md:text-sm">الاستماع بصوت {reciterName}</h4>
-                    <p className="text-[11px] text-white/70">{audioSubtitle}</p>
-                  </div>
-                  <div className="mr-4 hidden items-center gap-[3px] sm:flex">
-                    {WAVE.map((h, i) => (
-                      <span
-                        key={i}
-                        className={`w-[3px] rounded-full bg-[#FFDEA4]/80 ${audio.isPlaying ? "animate-pulse" : ""}`}
-                        style={{ height: h + 4, animationDelay: `${i * 70}ms` }}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <button
-                  onClick={audio.toggle}
-                  disabled={!audioReady}
-                  className="flex items-center gap-2 whitespace-nowrap rounded-xl bg-[#8C6A1C] px-5 py-2.5 text-xs font-bold text-[#FFF1D0] shadow transition hover:bg-[#9a7420] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#8C6A1C]"
-                >
-                  <BookOpen size={14} /> {audio.isPlaying ? "إيقاف مؤقت" : "ابدأ الورد الآن"}
-                </button>
-              </div>
-            </div>
-
-            <div className="z-10 grid grid-cols-1 items-end gap-6 md:grid-cols-12">
+            <div className="z-10 mt-10 grid grid-cols-1 items-end gap-6 md:grid-cols-12">
               <div className="space-y-5 md:col-span-8">
                 <p className="whitespace-pre-line text-2xl leading-[2.3] tracking-normal text-white drop-shadow-md md:text-[40px]" style={QURAN}>
                   «{activeItem.textArabic}»
