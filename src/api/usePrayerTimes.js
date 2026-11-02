@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "./client";
 
 
-const LOCATION = { latitude: 31.2, longitude: 29.92, country: "EG" };
+// Every prayer time on the site is for Alexandria. country=EG makes the API use the Egyptian
+// General Authority of Survey method.
+export const LOCATION = { latitude: 31.2, longitude: 29.92, country: "EG" };
 
 const PRAYERS = [
   ["fajr", "الفجر"],
