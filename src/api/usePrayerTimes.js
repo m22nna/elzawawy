@@ -13,6 +13,20 @@ const PRAYERS = [
   ["isha", "العشاء"],
 ];
 
+// The navbar and the hero both show prayer times: share one request per month instead of one each.
+const monthRequests = new Map();
+function fetchMonth(month) {
+  if (!monthRequests.has(month)) {
+    const q = new URLSearchParams({ ...LOCATION, month });
+    const request = api(`/v1/prayer-times?${q}`).catch((err) => {
+      monthRequests.delete(month); // let the next page view try again
+      throw err;
+    });
+    monthRequests.set(month, request);
+  }
+  return monthRequests.get(month);
+}
+
 const pad = (n) => String(n).padStart(2, "0");
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const hms = (ms) => {
@@ -26,14 +40,15 @@ export function usePrayerTimes() {
 
 
   useEffect(() => {
-    const ctrl = new AbortController();
+    let active = true;
     const d = new Date();
     const month = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-    const q = new URLSearchParams({ ...LOCATION, month });
-    api(`/v1/prayer-times?${q}`, { signal: ctrl.signal })
-      .then((data) => setDays(data.days))
-      .catch(() => {}); 
-    return () => ctrl.abort();
+    fetchMonth(month)
+      .then((data) => active && setDays(data.days))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
