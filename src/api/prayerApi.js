@@ -1,6 +1,8 @@
 // src/api/prayerApi.js
 
-const BASE_URL = 'https://zawawy-api-staging.onrender.com/v1';
+import { BASE } from './client';
+
+const BASE_URL = `${BASE}/v1`;
 
 /**
  * جلب مواقيت الصلاة للشهر بناءً على خط العرض والطول والشهر

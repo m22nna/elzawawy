@@ -1,5 +1,7 @@
 
-export const API_BASE = 'https://zawawy-api-staging.onrender.com';
+import { BASE } from '../../api/client';
+
+export const API_BASE = BASE;
 
 export const ADHAN_URL = 'https://islamic-audio.org/adhan/makkah.mp3';
 

@@ -9,6 +9,7 @@ import {
 import { usePrayerTimes } from '../api/usePrayerTimes';
 import { useAudio } from '../context/AudioContext';
 import { Link } from 'react-router-dom';
+import { BASE } from '../api/client';
 
 const PRAYER_ROWS = [
   ['fajr', 'الفجر'],
@@ -59,7 +60,7 @@ const Hero = ({ bgImageUrl }) => {
     const fetchRecitation = async () => {
       try {
         const res = await fetch(
-          'https://zawawy-api-staging.onrender.com/v1/recitations?reciter=zawawy'
+          `${BASE}/v1/recitations?reciter=zawawy`
         );
 
         if (res.ok) {
