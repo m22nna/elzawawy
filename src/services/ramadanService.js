@@ -3,6 +3,8 @@
  * Connects with Zawawy API staging for Ramadan playlists, daily content, prayer/imsakiah schedules, and supplications.
  */
 
+import { LOCATION } from '../api/usePrayerTimes';
+
 const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || 'https://zawawy-api-staging.onrender.com').replace(/\/+$/, '');
 
 /**
@@ -143,14 +145,14 @@ const ARABIC_GREGORIAN_MONTHS = [
 
 /**
  * Fetch Ramadan Imsakiah (Prayer schedule for 30 days of Ramadan)
- * Uses Umm Al-Qura methodology (Makkah coordinates)
+ * Alexandria, Egyptian General Authority of Survey (same location as the rest of the site)
  */
 export async function getRamadanImsakiah(year = 2026) {
   try {
     // Ramadan 1447 AH spans February and March 2026
     const [febRes, marRes] = await Promise.all([
-      requestApi('/v1/prayer-times?latitude=21.4225&longitude=39.8262&month=2026-02&country=SA'),
-      requestApi('/v1/prayer-times?latitude=21.4225&longitude=39.8262&month=2026-03&country=SA')
+      requestApi(`/v1/prayer-times?${new URLSearchParams({ ...LOCATION, month: '2026-02' })}`),
+      requestApi(`/v1/prayer-times?${new URLSearchParams({ ...LOCATION, month: '2026-03' })}`)
     ]);
 
     const allDays = [...(febRes?.days || []), ...(marRes?.days || [])];
