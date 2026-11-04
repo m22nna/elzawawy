@@ -17,6 +17,19 @@ const GREEN = '#0f3d30';
 const GOLD = '#b98f3e';
 const BORDER = '#e6e3da';
 
+
+const normalizeCityName = (text) => {
+  return String(text || '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/[ًٌٍَُِّْـ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
 function Modal({ title, onClose, wide = false, children }) {
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
@@ -68,8 +81,16 @@ export function PlaceModal({ current, onSelect, onClose }) {
   const [q, setQ] = useState('');
   const [geo, setGeo] = useState('idle'); // idle | loading | denied | unsupported
 
-  const term = q.trim();
-  const list = PLACES.filter((p) => !term || `${p.name} ${p.countryName}`.includes(term));
+  const term = normalizeCityName(q);
+
+const list = PLACES.filter((p) => {
+  const searchableText = normalizeCityName(
+    `${p.name} ${p.countryName} ${p.nameEnglish || ''} ${p.id}`
+  );
+
+  return !term || searchableText.includes(term);
+});
+
 
   const useMyLocation = () => {
     if (!navigator.geolocation) {

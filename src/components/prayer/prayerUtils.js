@@ -1,10 +1,9 @@
 
 export const API_BASE = 'https://zawawy-api-staging.onrender.com';
 
-export const ADHAN_URL = 'https://islamic-audio.org/adhan/makkah.mp3';
 
 
-export const HERO_IMAGE = "url('/images/prayer-bg.png')";
+export const HERO_IMAGE = "url('/images/prayer-bg.webp')";
 
 /* الصلوات الخمس بالترتيب (الشروق مش صلاة فمش داخل في العدّاد) */
 export const PRAYERS = [

@@ -60,7 +60,7 @@ const RamadanPage = () => {
   const [dailyReminders, setDailyReminders] = useState([]);
 
   // Selected Day state (1 to 30)
-  const [selectedDayNumber, setSelectedDayNumber] = useState(4); // Default: 4 Ramadan
+  const [selectedDayNumber, setSelectedDayNumber] = useState(1); // Default: 4 Ramadan
 
 
   // Modal states for Resources Cards

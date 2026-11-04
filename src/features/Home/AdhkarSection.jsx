@@ -15,7 +15,6 @@ import { Link } from "react-router-dom";
 /* ───────────── Design tokens ───────────── */
 const C = { goldRing: "#C69234" };
 
-
 const QURAN = {
   fontFamily: "'Amiri Quran', 'Amiri', serif",
   fontWeight: 400,
@@ -27,6 +26,7 @@ const QURAN = {
   textRendering: "optimizeLegibility",
   direction: "rtl",
 };
+
 const FONTS_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
 `;
@@ -59,10 +59,40 @@ const CAT_META = {
   "prophetic-duas": { Icon: ScrollText, iconTone: "mint", group: "occasions" },
   "tasbih-and-istighfar": { Icon: InfinityIcon, iconTone: "mint", group: "daily" },
 };
+
 const DEFAULT_META = { Icon: BookOpen, iconTone: "mint", group: "occasions" };
 
 const TASBIH_SLUG = "tasbih-and-istighfar";
+
 const SAVED_ADHKAR_KEY = "adhkar:saved:v1";
+const CUSTOM_CARDS_KEY = "adhkar:custom-cards:v1";
+const CUSTOM_COUNTERS_KEY = "adhkar:custom-counters:v1";
+
+const ITEM_PROGRESS_KEY = "adhkar:item-progress:v1";
+
+const readItemProgress = () => {
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem(ITEM_PROGRESS_KEY) || "{}"
+    );
+
+    const today = new Date().toLocaleDateString("en-CA");
+
+    if (saved.date !== today) {
+      return {
+        date: today,
+        counts: {},
+      };
+    }
+
+    return saved;
+  } catch {
+    return {
+      date: new Date().toLocaleDateString("en-CA"),
+      counts: {},
+    };
+  }
+};
 
 const readSavedAdhkar = () => {
   try {
@@ -73,6 +103,33 @@ const readSavedAdhkar = () => {
   }
 };
 
+/* قراءة البيانات المحفوظة من localStorage */
+const readLocalStorage = (key, fallback) => {
+  try {
+    const value = JSON.parse(localStorage.getItem(key));
+
+    if (value === null || value === undefined) {
+      return fallback;
+    }
+
+    return value;
+  } catch {
+    return fallback;
+  }
+};
+
+const readCustomCards = () => {
+  const value = readLocalStorage(CUSTOM_CARDS_KEY, []);
+  return Array.isArray(value) ? value : [];
+};
+
+const readCustomCounters = () => {
+  const value = readLocalStorage(CUSTOM_COUNTERS_KEY, {});
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : {};
+};
+
 const ICON_TONE = {
   brown: "bg-[#7A5A14] text-white",
   green: "bg-[#063F30] text-white",
@@ -80,7 +137,8 @@ const ICON_TONE = {
   cream: "bg-[#FFE9C2] text-[#7A5A14]",
 };
 
-const bySortOrder = (a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0);
+const bySortOrder = (a, b) =>
+  (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0);
 
 const normalize = (list) =>
   [...list].sort(bySortOrder).map((c) => ({
@@ -93,7 +151,9 @@ const normalize = (list) =>
 
 const buildTasbihCards = (categories) => {
   const cat = categories.find((c) => c.slug === TASBIH_SLUG);
+
   if (!cat) return [];
+
   return cat.items.map((it, i) => ({
     id: `api_${it.sortOrder ?? i}`,
     text: `«${String(it.textArabic).trim().replace(/[.۔]$/, "")}»`,
@@ -104,32 +164,60 @@ const buildTasbihCards = (categories) => {
 };
 
 function useAdhkar() {
-  const [state, setState] = useState({ data: null, error: null, loading: true });
+  const [state, setState] = useState({
+    data: null,
+    error: null,
+    loading: true,
+  });
+
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     const ctrl = new AbortController();
-    setState((s) => ({ ...s, error: null, loading: true }));
+
+    setState((s) => ({
+      ...s,
+      error: null,
+      loading: true,
+    }));
+
     api("/v1/adhkar", { signal: ctrl.signal })
       .then((res) => {
         const list = Array.isArray(res) ? res : [];
-        setState({ data: normalize(list), error: null, loading: false });
+
+        setState({
+          data: normalize(list),
+          error: null,
+          loading: false,
+        });
       })
       .catch((error) => {
         if (error.name === "AbortError") return;
+
         console.error("API error: /v1/adhkar", error);
-        setState({ data: null, error, loading: false });
+
+        setState({
+          data: null,
+          error,
+          loading: false,
+        });
       });
+
     return () => ctrl.abort();
   }, [attempt]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
+
   return { ...state, retry };
 }
 
 function PageShell({ children }) {
   return (
-    <div dir="rtl" className="min-h-screen bg-[#EFF8F3] text-[#063F30]" style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}>
+    <div
+      dir="rtl"
+      className="min-h-screen bg-[#EFF8F3] text-[#063F30]"
+      style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
+    >
       <style>{FONTS_CSS}</style>
       <Navbar />
       {children}
@@ -139,12 +227,19 @@ function PageShell({ children }) {
 
 function SlowHint() {
   const [slow, setSlow] = useState(false);
+
   useEffect(() => {
     const t = setTimeout(() => setSlow(true), 6000);
     return () => clearTimeout(t);
   }, []);
+
   if (!slow) return null;
-  return <p className="mt-2 text-xs text-[#063F30]/60"> أول تحميل ممكن ياخد لحد دقيقة</p>;
+
+  return (
+    <p className="mt-2 text-xs text-[#063F30]/60">
+      أول تحميل ممكن ياخد لحد دقيقة
+    </p>
+  );
 }
 
 export default function AdhkarSection() {
@@ -153,34 +248,87 @@ export default function AdhkarSection() {
 
   const [selectedSlug, setSelectedSlug] = useState(null);
   const [activeItemIndex, setActiveItemIndex] = useState(0);
-  const [itemCounter, setItemCounter] = useState(0);
+const [itemProgress, setItemProgress] = useState(readItemProgress);
   const [filter, setFilter] = useState("all");
+
   const [savedItems, setSavedItems] = useState(readSavedAdhkar);
+  const [showSavedList, setShowSavedList] = useState(false);
+
   const [actionMessage, setActionMessage] = useState("");
   const [storeTick, setStoreTick] = useState(0);
 
-  const [customCards, setCustomCards] = useState([]);
-  const [counters, setCounters] = useState({});
+  /* تحميل العدادات المخصصة من localStorage */
+  const [customCards, setCustomCards] = useState(readCustomCards);
+  const [counters, setCounters] = useState(readCustomCounters);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newCardText, setNewCardText] = useState("");
   const [newCardTarget, setNewCardTarget] = useState(100);
   const [newCardLabel, setNewCardLabel] = useState("");
 
-  const sessionRef = useRef(null);
-  const advanceTimer = useRef(null);
-  useEffect(() => () => clearTimeout(advanceTimer.current), []);
 
   useEffect(() => {
+  try {
+    localStorage.setItem(
+      ITEM_PROGRESS_KEY,
+      JSON.stringify({
+        date: new Date().toLocaleDateString("en-CA"),
+        counts: itemProgress.counts || {},
+      })
+    );
+  } catch (error) {
+    console.error("Could not save adhkar progress", error);
+  }
+}, [itemProgress]);
+
+  const sessionRef = useRef(null);
+  const advanceTimer = useRef(null);
+
+  useEffect(() => {
+    return () => clearTimeout(advanceTimer.current);
+  }, []);
+
+  /* حفظ الأذكار المحفوظة */
+  useEffect(() => {
     try {
-      localStorage.setItem(SAVED_ADHKAR_KEY, JSON.stringify(savedItems));
+      localStorage.setItem(
+        SAVED_ADHKAR_KEY,
+        JSON.stringify(savedItems)
+      );
     } catch (error) {
       console.error("Could not save adhkar", error);
     }
   }, [savedItems]);
 
+  /* حفظ العدادات المخصصة */
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        CUSTOM_CARDS_KEY,
+        JSON.stringify(customCards)
+      );
+    } catch (error) {
+      console.error("Could not save custom cards", error);
+    }
+  }, [customCards]);
+
+  /* حفظ أرقام العدادات */
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        CUSTOM_COUNTERS_KEY,
+        JSON.stringify(counters)
+      );
+    } catch (error) {
+      console.error("Could not save custom counters", error);
+    }
+  }, [counters]);
+
   useEffect(() => {
     if (!actionMessage) return;
+
     const timer = setTimeout(() => setActionMessage(""), 2500);
+
     return () => clearTimeout(timer);
   }, [actionMessage]);
 
@@ -189,33 +337,63 @@ export default function AdhkarSection() {
     categories.find((c) => c.slug === "morning") ||
     categories[0] ||
     null;
+
   const activeSlug = selectedCategory?.slug;
-  const activeItems = selectedCategory?.items || [];
-  const activeItem = activeItems[activeItemIndex] || activeItems[0] || null;
+const activeItems = selectedCategory?.items || [];
+const activeItem = activeItems[activeItemIndex] || activeItems[0] || null;
+
+const activeProgressKey = activeItem
+  ? `${activeSlug}:${activeItem.id ?? activeItemIndex}`
+  : "";
+
+const itemCounter = activeProgressKey
+  ? Number(itemProgress.counts?.[activeProgressKey]) || 0
+  : 0;
+
+
   const currentUi = CATEGORY_UI[activeSlug] || DEFAULT_UI;
   const currentMeta = CAT_META[activeSlug] || DEFAULT_META;
   const HeroIcon = currentMeta.Icon;
 
   const repeat = activeItem?.repeatCount || 1;
   const remaining = Math.max(0, repeat - itemCounter);
-  // المنجز = الأذكار اللي خلصت فعلاً (نفس المحفوظ اللي بيقراه كارت الرئيسية)
+
+  // المنجز = الأذكار اللي خلصت فعلاً
   const doneCount = useMemo(
-    () => Math.min(storeDoneCount(loadProgress(), activeSlug), activeItems.length),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeSlug, activeItems.length, storeTick],
+    () =>
+      Math.min(
+        storeDoneCount(loadProgress(), activeSlug),
+        activeItems.length
+      ),
+    [activeSlug, activeItems.length, storeTick]
   );
-  const progressPercent = activeItems.length > 0 ? Math.round((doneCount / activeItems.length) * 100) : 0;
 
-  const savedKey = activeItem ? `${activeSlug}:${activeItem.id ?? activeItemIndex}` : "";
-  const isActiveSaved = savedItems.some((item) => item.key === savedKey);
+  const progressPercent =
+    activeItems.length > 0
+      ? Math.round((doneCount / activeItems.length) * 100)
+      : 0;
 
+  const savedKey = activeItem
+    ? `${activeSlug}:${activeItem.id ?? activeItemIndex}`
+    : "";
+
+  const isActiveSaved = savedItems.some(
+    (item) => item.key === savedKey
+  );
+
+  /* حفظ أو إزالة الذكر الحالي */
   const toggleSaveActiveItem = () => {
     if (!activeItem || !savedKey) return;
+
     if (isActiveSaved) {
-      setSavedItems((items) => items.filter((item) => item.key !== savedKey));
+      setSavedItems((items) =>
+        items.filter((item) => item.key !== savedKey)
+      );
+
       setActionMessage("تمت إزالة الذكر من المحفوظات");
       return;
     }
+
     setSavedItems((items) => [
       ...items,
       {
@@ -228,20 +406,72 @@ export default function AdhkarSection() {
         savedAt: Date.now(),
       },
     ]);
+
     setActionMessage("تم حفظ الذكر بنجاح");
+  };
+
+  /* عرض ذكر من قائمة المحفوظات */
+  const handleOpenSavedItem = (savedItem) => {
+    const category = categories.find(
+      (cat) => cat.slug === savedItem.slug
+    );
+
+    if (!category) {
+      setActionMessage("هذا القسم لم يعد متاحًا حاليًا");
+      return;
+    }
+
+    const itemIndex = category.items.findIndex(
+      (item, index) =>
+        `${savedItem.slug}:${item.id ?? index}` === savedItem.key
+    );
+
+    if (itemIndex === -1) {
+      setActionMessage("هذا الذكر لم يعد متاحًا حاليًا");
+      return;
+    }
+
+    clearTimeout(advanceTimer.current);
+
+    setSelectedSlug(savedItem.slug);
+    setActiveItemIndex(itemIndex);
+    setShowSavedList(false);
+
+    sessionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
+  /* حذف ذكر من قائمة المحفوظات */
+  const handleRemoveSavedItem = (key) => {
+    setSavedItems((items) =>
+      items.filter((item) => item.key !== key)
+    );
+
+    setActionMessage("تم حذف الذكر من المحفوظات");
   };
 
   const shareActiveItem = async () => {
     if (!activeItem) return;
+
     const shareText = [
       `«${activeItem.textArabic}»`,
-      activeItem.reference ? `المصدر: ${activeItem.reference}` : "",
+      activeItem.reference
+        ? `المصدر: ${activeItem.reference}`
+        : "",
       "من صفحة الأذكار والأدعية - الزواوي",
-    ].filter(Boolean).join("\n\n");
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
     try {
       if (navigator.share) {
-        await navigator.share({ title: "ذكر من الأذكار والأدعية", text: shareText });
+        await navigator.share({
+          title: "ذكر من الأذكار والأدعية",
+          text: shareText,
+        });
+
         setActionMessage("تم فتح قائمة المشاركة");
       } else if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(shareText);
@@ -262,62 +492,113 @@ export default function AdhkarSection() {
   };
 
   const goTo = (i) => {
-    clearTimeout(advanceTimer.current);
-    setActiveItemIndex(i);
-    setItemCounter(0);
-  };
+  clearTimeout(advanceTimer.current);
+  setActiveItemIndex(i);
+};
 
   const handleIncrement = () => {
-    if (!activeItem || itemCounter >= repeat) return;
-    const next = itemCounter + 1;
-    setItemCounter(next);
-    if (next >= repeat) {
-      markDone(activeSlug, activeItemIndex);
-      setStoreTick((t) => t + 1);
-    }
-    if (next >= repeat && activeItemIndex + 1 < activeItems.length) {
-      advanceTimer.current = setTimeout(() => {
-        setActiveItemIndex((p) => p + 1);
-        setItemCounter(0);
-      }, 700);
-    }
-  };
+  if (!activeItem || itemCounter >= repeat) return;
 
+  const next = itemCounter + 1;
+
+  setItemProgress((prev) => ({
+    ...prev,
+    counts: {
+      ...prev.counts,
+      [activeProgressKey]: next,
+    },
+  }));
+
+  if (next >= repeat) {
+    markDone(activeSlug, activeItemIndex);
+    setStoreTick((t) => t + 1);
+  }
+
+  if (next >= repeat && activeItemIndex + 1 < activeItems.length) {
+    advanceTimer.current = setTimeout(() => {
+      setActiveItemIndex((p) => p + 1);
+    }, 700);
+  }
+};
+
+  /* زيادة عداد التسبيح */
   const handleTasbihIncrement = (id) => {
-    setCounters((prev) => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
+    setCounters((prev) => ({
+      ...prev,
+      [id]: (prev[id] || 0) + 1,
+    }));
   };
 
+  /* إنشاء عداد مخصص */
   const handleCreateCustomCard = (e) => {
     e.preventDefault();
+
     if (!newCardText.trim()) return;
+
+    const target = Math.min(
+      1000,
+      Math.max(1, Number(newCardTarget) || 100)
+    );
+
     const newCard = {
       id: `custom_${Date.now()}`,
       text: `«${newCardText.trim()}»`,
-      target: Number(newCardTarget) || 100,
+      target,
       label: newCardLabel.trim() || "ورد خاص",
       dotColor: "#063F30",
     };
+
     setCustomCards((prev) => [...prev, newCard]);
+
     setNewCardText("");
+    setNewCardTarget(100);
     setNewCardLabel("");
     setIsModalOpen(false);
+
+    setActionMessage("تم إنشاء العداد بنجاح");
+  };
+
+  /* حذف عداد مخصص */
+  const handleDeleteCustomCard = (id) => {
+    const confirmed = window.confirm(
+      "هل أنت متأكد من حذف هذا العداد؟"
+    );
+
+    if (!confirmed) return;
+
+    setCustomCards((prev) =>
+      prev.filter((card) => card.id !== id)
+    );
+
+    setCounters((prev) => {
+      const updatedCounters = { ...prev };
+      delete updatedCounters[id];
+      return updatedCounters;
+    });
+
+    setActionMessage("تم حذف العداد بنجاح");
   };
 
   const selectCategory = (slug) => {
-    clearTimeout(advanceTimer.current);
-    setSelectedSlug(slug);
-    setActiveItemIndex(0);
-    setItemCounter(0);
-    sessionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  clearTimeout(advanceTimer.current);
 
+  setSelectedSlug(slug);
+  setActiveItemIndex(0);
+
+  sessionRef.current?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+};
   /* ───── حالات التحميل / الخطأ / الفراغ ───── */
   if (loading) {
     return (
       <PageShell>
         <div className="flex flex-col items-center justify-center pt-32 text-[#063F30]">
           <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-[#063F30] border-t-transparent" />
-          <p className="text-sm font-bold">جاري تحميل الأذكار والأدعية من السيرفر...</p>
+          <p className="text-sm font-bold">
+            جاري تحميل الأذكار والأدعية من السيرفر...
+          </p>
           <SlowHint />
         </div>
       </PageShell>
@@ -331,13 +612,21 @@ export default function AdhkarSection() {
           <span className="mb-4 grid h-14 w-14 place-items-center rounded-full bg-[#FFE9C2] text-[#7A5A14]">
             <AlertTriangle size={26} />
           </span>
-          <p className="text-base font-bold">تعذّر تحميل الأذكار</p>
-          <p className="mt-1 text-xs text-[#063F30]/65">اتأكد من الاتصال بالإنترنت وجرّب تاني.</p>
+
+          <p className="text-base font-bold">
+            تعذّر تحميل الأذكار
+          </p>
+
+          <p className="mt-1 text-xs text-[#063F30]/65">
+            اتأكد من الاتصال بالإنترنت وجرّب تاني.
+          </p>
+
           <button
             onClick={retry}
             className="mt-5 flex items-center gap-2 rounded-xl bg-[#063F30] px-6 py-3 text-xs font-bold text-white shadow transition hover:bg-[#084e3c]"
           >
-            <RotateCw size={14} /> إعادة المحاولة
+            <RotateCw size={14} />
+            إعادة المحاولة
           </button>
         </div>
       </PageShell>
@@ -348,12 +637,16 @@ export default function AdhkarSection() {
     return (
       <PageShell>
         <div className="flex flex-col items-center justify-center pt-32 text-center">
-          <p className="text-base font-bold">لا توجد أذكار متاحة حاليًا</p>
+          <p className="text-base font-bold">
+            لا توجد أذكار متاحة حاليًا
+          </p>
+
           <button
             onClick={retry}
             className="mt-5 flex items-center gap-2 rounded-xl bg-[#063F30] px-6 py-3 text-xs font-bold text-white shadow transition hover:bg-[#084e3c]"
           >
-            <RotateCw size={14} /> تحديث
+            <RotateCw size={14} />
+            تحديث
           </button>
         </div>
       </PageShell>
@@ -362,29 +655,49 @@ export default function AdhkarSection() {
 
   const visibleCategories = categories.filter((cat) => {
     if (filter === "all") return true;
+
     return (CAT_META[cat.slug] || DEFAULT_META).group === filter;
   });
 
-  const tasbihCards = [...buildTasbihCards(categories), ...customCards];
+  const tasbihCards = [
+    ...buildTasbihCards(categories),
+    ...customCards,
+  ];
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#EFF8F3] pb-44 text-[#063F30]" style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}>
+    <div
+      dir="rtl"
+      className="min-h-screen bg-[#EFF8F3] pb-44 text-[#063F30]"
+      style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
+    >
       <style>{FONTS_CSS}</style>
       <Navbar />
 
       <Wrap className="pb-2 pt-6">
         <div className="mb-3 flex items-center gap-1.5 text-xs text-[#063F30]/60">
-          <Link to="/" className="cursor-pointer hover:underline">الرئيسية</Link>
+          <Link to="/" className="cursor-pointer hover:underline">
+            الرئيسية
+          </Link>
+
           <ChevronLeft size={12} />
-          <span className="font-bold text-[#063F30]">الأذكار والأدعية</span>
+
+          <span className="font-bold text-[#063F30]">
+            الأذكار والأدعية
+          </span>
         </div>
 
         <div className="my-2 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold text-[#063F30] md:text-4xl">الأذكار والأدعية</h1>
-              <span className="grid h-9 w-9 place-items-center rounded-full bg-[#F6E7C3] text-lg text-[#C69234]">✦</span>
+              <h1 className="text-3xl font-bold text-[#063F30] md:text-4xl">
+                الأذكار والأدعية
+              </h1>
+
+              <span className="grid h-9 w-9 place-items-center rounded-full bg-[#F6E7C3] text-lg text-[#C69234]">
+                ✦
+              </span>
             </div>
+
             <p className="mt-2 text-sm text-[#063F30]/70">
               اجعل ذكر الله جزءاً من يومك، واختر ما يناسب وقتك وحاجتك من السُّنّة المطهّرة بصوت الشيخ عبد الرحمن الزواوي.
             </p>
@@ -393,17 +706,44 @@ export default function AdhkarSection() {
           <div className="flex items-center gap-3 rounded-2xl border border-[#DCEAE2] bg-white p-3 shadow-sm">
             <div className="relative flex h-12 w-12 items-center justify-center">
               <svg className="h-12 w-12 -rotate-90">
-                <circle cx="24" cy="24" r="20" stroke="#E3EEE8" strokeWidth="4" fill="transparent" />
-                <circle cx="24" cy="24" r="20" stroke={C.goldRing} strokeWidth="4" fill="transparent" strokeLinecap="round"
-                  strokeDasharray="125.66" strokeDashoffset={125.66 - (125.66 * progressPercent) / 100} />
+                <circle
+                  cx="24"
+                  cy="24"
+                  r="20"
+                  stroke="#E3EEE8"
+                  strokeWidth="4"
+                  fill="transparent"
+                />
+
+                <circle
+                  cx="24"
+                  cy="24"
+                  r="20"
+                  stroke={C.goldRing}
+                  strokeWidth="4"
+                  fill="transparent"
+                  strokeLinecap="round"
+                  strokeDasharray="125.66"
+                  strokeDashoffset={
+                    125.66 - (125.66 * progressPercent) / 100
+                  }
+                />
               </svg>
-              <span className="absolute text-[10px] font-bold text-[#063F30]">{progressPercent}%</span>
+
+              <span className="absolute text-[10px] font-bold text-[#063F30]">
+                {progressPercent}%
+              </span>
             </div>
+
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-[#7A5A14]"></span>
-                <span className="text-xs font-bold text-[#063F30]">الورد اليومي المنجز</span>
+                <span className="h-2 w-2 rounded-full bg-[#7A5A14]" />
+
+                <span className="text-xs font-bold text-[#063F30]">
+                  الورد اليومي المنجز
+                </span>
               </div>
+
               <span className="text-[11px] text-[#063F30]/60">
                 {doneCount} من {activeItems.length} ذكراً متواصلاً
               </span>
@@ -417,17 +757,23 @@ export default function AdhkarSection() {
         <Wrap className="my-4">
           <div
             className="relative flex min-h-[620px] flex-col justify-between overflow-hidden rounded-xl border border-[#063F30]/40 bg-cover bg-center p-6 shadow-xl md:min-h-[820px] md:p-8"
-            style={{ backgroundImage: `linear-gradient(to bottom, rgba(6, 63, 48, 0.4), rgba(6, 63, 48, 0.85)), url('/background.jpg')` }}
+            style={{
+              backgroundImage: `linear-gradient(to bottom, rgba(6, 63, 48, 0.4), rgba(6, 63, 48, 0.85)), url('/background.jpg')`,
+            }}
           >
             <div className="z-10 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="flex items-center gap-1.5 rounded-full bg-[#FFDEA4] px-4 py-1.5 text-xs font-bold text-[#063F30] shadow-sm">
-                  <HeroIcon size={13} /> {selectedCategory.nameArabic}
+                  <HeroIcon size={13} />
+                  {selectedCategory.nameArabic}
                 </span>
+
                 <span className="flex items-center gap-1.5 rounded-full border border-white/15 bg-[#0D2018]/60 px-3.5 py-1.5 text-[11px] text-white/90 backdrop-blur-md">
-                  <Clock size={12} /> الوقت المستحب: {currentUi.when}
+                  <Clock size={12} />
+                  الوقت المستحب: {currentUi.when}
                 </span>
               </div>
+
               <span className="flex items-center gap-2 rounded-full border border-white/15 bg-[#0D2018]/60 px-4 py-1.5 text-[11px] font-bold text-white/90 backdrop-blur-md">
                 التكرار المطلوب: {times(repeat)}
                 <span className="h-1.5 w-1.5 rounded-full bg-[#FFDEA4]" />
@@ -437,13 +783,18 @@ export default function AdhkarSection() {
 
             <div className="z-10 mt-10 grid grid-cols-1 items-end gap-6 md:grid-cols-12">
               <div className="space-y-5 md:col-span-8">
-                <p className="whitespace-pre-line text-2xl leading-[2.3] tracking-normal text-white drop-shadow-md md:text-[40px]" style={QURAN}>
+                <p
+                  className="whitespace-pre-line text-2xl leading-[2.3] tracking-normal text-white drop-shadow-md md:text-[40px]"
+                  style={QURAN}
+                >
                   «{activeItem.textArabic}»
                 </p>
+
                 {activeItem.reference && (
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="flex items-center gap-1.5 rounded-full border border-white/15 bg-[#0D2018]/60 px-3.5 py-1.5 text-xs text-white/90 backdrop-blur-md">
-                      <ScrollText size={13} className="text-[#FFDEA4]" /> المصدر: {activeItem.reference}
+                      <ScrollText size={13} className="text-[#FFDEA4]" />
+                      المصدر: {activeItem.reference}
                     </span>
                   </div>
                 )}
@@ -451,27 +802,55 @@ export default function AdhkarSection() {
 
               <div className="flex justify-end md:col-span-4">
                 <div className="w-full max-w-[300px] rounded-2xl border border-white/20 bg-[#0D2018]/60 p-5 text-center shadow-2xl backdrop-blur-md">
-                  <span className="mb-3 block text-[11px] font-bold text-white/70">مؤشر تكرار الذكر</span>
+                  <span className="mb-3 block text-[11px] font-bold text-white/70">
+                    مؤشر تكرار الذكر
+                  </span>
 
                   <div className="relative mx-auto my-1 flex h-28 w-28 items-center justify-center">
                     <svg className="h-28 w-28 -rotate-90" viewBox="0 0 80 80">
-                      <circle cx="40" cy="40" r="32" stroke="rgba(255,255,255,0.2)" strokeWidth="6" fill="transparent" />
                       <circle
-                        cx="40" cy="40" r="32" stroke="#FFDEA4" strokeWidth="6" fill="transparent" strokeLinecap="round"
+                        cx="40"
+                        cy="40"
+                        r="32"
+                        stroke="rgba(255,255,255,0.2)"
+                        strokeWidth="6"
+                        fill="transparent"
+                      />
+
+                      <circle
+                        cx="40"
+                        cy="40"
+                        r="32"
+                        stroke="#FFDEA4"
+                        strokeWidth="6"
+                        fill="transparent"
+                        strokeLinecap="round"
                         strokeDasharray="201.06"
-                        strokeDashoffset={201.06 - 201.06 * Math.min(1, itemCounter / repeat)}
+                        strokeDashoffset={
+                          201.06 -
+                          201.06 * Math.min(1, itemCounter / repeat)
+                        }
                         className="transition-all duration-300"
                       />
                     </svg>
+
                     <div className="absolute flex flex-col items-center">
-                      <span className="text-2xl font-bold text-white">{itemCounter} / {repeat}</span>
-                      <span className="text-[10px] text-white/60">مكتمل</span>
+                      <span className="text-2xl font-bold text-white">
+                        {itemCounter} / {repeat}
+                      </span>
+
+                      <span className="text-[10px] text-white/60">
+                        مكتمل
+                      </span>
                     </div>
                   </div>
 
                   <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2 text-[11px] text-white/70">
                     <span>المتبقي: {times(remaining)}</span>
-                    <span>{Math.round((itemCounter / repeat) * 100)}% منجَز</span>
+
+                    <span>
+                      {Math.round((itemCounter / repeat) * 100)}% منجَز
+                    </span>
                   </div>
                 </div>
               </div>
@@ -482,33 +861,167 @@ export default function AdhkarSection() {
 
       {/* جلسة الذكر التفاعلية */}
       <Wrap className="my-10">
-        <div ref={sessionRef} className="mb-6 flex items-center justify-between border-b border-[#DCEAE2] pb-5">
+        <div
+          ref={sessionRef}
+          className="mb-6 flex flex-col gap-4 border-b border-[#DCEAE2] pb-5 md:flex-row md:items-center md:justify-between"
+        >
           <div>
-            <h2 className="text-[26px] font-bold text-[#063F30]">جلسة الذكر التفاعلية</h2>
-            <p className="mt-1 text-sm text-[#063F30]/65">اقرأ بتمعّن، واستحضر القلب مع كل تسبيحة ودعاء.</p>
+            <h2 className="text-[26px] font-bold text-[#063F30]">
+              جلسة الذكر التفاعلية
+            </h2>
+
+            <p className="mt-1 text-sm text-[#063F30]/65">
+              اقرأ بتمعّن، واستحضر القلب مع كل تسبيحة ودعاء.
+            </p>
           </div>
-          <div className="flex items-center gap-3">
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* زر المحفوظات */}
             <button
-              disabled={activeItemIndex === 0}
-              onClick={() => goTo(activeItemIndex - 1)}
-              aria-label="السابق"
-              className="grid h-10 w-10 place-items-center rounded-xl bg-[#E3EEE8] text-[#063F30] transition hover:bg-[#d4e6dc] disabled:opacity-40"
+              type="button"
+              onClick={() => setShowSavedList((prev) => !prev)}
+              aria-expanded={showSavedList}
+              className={`flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold transition ${
+                showSavedList
+                  ? "bg-[#063F30] text-white"
+                  : "bg-[#E3EEE8] text-[#063F30] hover:bg-[#d4e6dc]"
+              }`}
             >
-              <ChevronRight size={16} />
+              <Bookmark
+                size={15}
+                fill={showSavedList ? "currentColor" : "none"}
+              />
+
+              المحفوظات
+
+              <span
+                className={`grid min-w-5 h-5 place-items-center rounded-full px-1 text-[10px] ${
+                  showSavedList
+                    ? "bg-white text-[#063F30]"
+                    : "bg-[#063F30] text-white"
+                }`}
+              >
+                {savedItems.length}
+              </span>
             </button>
-            <span className="rounded-full bg-[#E3EEE8] px-4 py-1.5 text-xs font-bold text-[#063F30]">
-              {activeItems.length > 0 ? activeItemIndex + 1 : 0} من {activeItems.length}
-            </span>
-            <button
-              disabled={activeItemIndex + 1 >= activeItems.length}
-              onClick={() => goTo(activeItemIndex + 1)}
-              aria-label="التالي"
-              className="grid h-10 w-10 place-items-center rounded-xl bg-[#E3EEE8] text-[#063F30] transition hover:bg-[#d4e6dc] disabled:opacity-40"
-            >
-              <ChevronLeft size={16} />
-            </button>
+
+            {/* التنقل بين الأذكار */}
+            <div className="flex items-center gap-2">
+              <button
+                disabled={activeItemIndex === 0}
+                onClick={() => goTo(activeItemIndex - 1)}
+                aria-label="السابق"
+                className="grid h-10 w-10 place-items-center rounded-xl bg-[#E3EEE8] text-[#063F30] transition hover:bg-[#d4e6dc] disabled:opacity-40"
+              >
+                <ChevronRight size={16} />
+              </button>
+
+              <span className="rounded-full bg-[#E3EEE8] px-4 py-2 text-xs font-bold text-[#063F30]">
+                {activeItems.length > 0 ? activeItemIndex + 1 : 0} من {activeItems.length}
+              </span>
+
+              <button
+                disabled={activeItemIndex + 1 >= activeItems.length}
+                onClick={() => goTo(activeItemIndex + 1)}
+                aria-label="التالي"
+                className="grid h-10 w-10 place-items-center rounded-xl bg-[#E3EEE8] text-[#063F30] transition hover:bg-[#d4e6dc] disabled:opacity-40"
+              >
+                <ChevronLeft size={16} />
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* قائمة الأذكار المحفوظة */}
+        {showSavedList && (
+          <div className="mb-6 rounded-2xl border border-[#DCEAE2] bg-white p-5 shadow-sm md:p-6">
+            <div className="mb-5 flex items-center justify-between border-b border-[#E3EEE8] pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-[#063F30]">
+                  الأذكار المحفوظة
+                </h3>
+
+                <p className="mt-1 text-xs text-[#063F30]/60">
+                  الأذكار التي قمت بحفظها للرجوع إليها لاحقًا
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowSavedList(false)}
+                aria-label="إغلاق المحفوظات"
+                className="grid h-9 w-9 place-items-center rounded-full bg-[#E3EEE8] text-[#063F30] transition hover:bg-[#d4e6dc]"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {savedItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <span className="mb-3 grid h-14 w-14 place-items-center rounded-full bg-[#E3EEE8] text-[#063F30]">
+                  <Bookmark size={24} />
+                </span>
+
+                <p className="text-sm font-bold text-[#063F30]">
+                  لا توجد أذكار محفوظة حتى الآن
+                </p>
+
+                <p className="mt-2 text-xs text-[#063F30]/60">
+                  اضغط على علامة الحفظ بجانب أي ذكر لإضافته هنا.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {savedItems.map((item) => (
+                  <div
+                    key={item.key}
+                    className="flex flex-col justify-between rounded-xl border border-[#DCEAE2] bg-[#F7FCF9] p-4 transition hover:border-[#B8D2C3]"
+                  >
+                    <div>
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <span className="rounded-full bg-[#E3EEE8] px-3 py-1 text-[10px] font-bold text-[#063F30]">
+                          {item.categoryName}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSavedItem(item.key)}
+                          aria-label="حذف الذكر من المحفوظات"
+                          title="حذف من المحفوظات"
+                          className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-red-50 text-red-600 transition hover:bg-red-100"
+                        >
+                          <X size={15} />
+                        </button>
+                      </div>
+
+                      <p
+                        className="whitespace-pre-line text-base leading-[2.2] text-[#063F30]"
+                        style={QURAN}
+                      >
+                        «{item.textArabic}»
+                      </p>
+
+                      {item.reference && (
+                        <p className="mt-3 text-[11px] text-[#063F30]/60">
+                          المصدر: {item.reference}
+                        </p>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenSavedItem(item)}
+                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#063F30] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#084e3c]"
+                    >
+                      عرض الذكر
+                      <ArrowLeft size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {activeItem && (
           <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-12">
@@ -518,12 +1031,28 @@ export default function AdhkarSection() {
                   <span className="rounded-full bg-[#E3EEE8] px-4 py-1.5 text-xs font-bold text-[#063F30]">
                     الذكر {ORDINALS[activeItemIndex] || `رقم ${activeItemIndex + 1}`} • {selectedCategory.nameArabic}
                   </span>
-                  <button onClick={() => setItemCounter(0)} className="flex items-center gap-1.5 text-xs text-[#063F30]/70 hover:text-[#063F30]">
-                    <RotateCw size={13} /> إعادة ضبط
+
+                  <button
+ onClick={() =>
+  setItemProgress((prev) => ({
+    ...prev,
+    counts: {
+      ...prev.counts,
+      [activeProgressKey]: 0,
+    },
+  }))
+}
+                    className="flex items-center gap-1.5 text-xs text-[#063F30]/70 hover:text-[#063F30]"
+                  >
+                    <RotateCw size={13} />
+                    إعادة ضبط
                   </button>
                 </div>
 
-                <p className="my-8 whitespace-pre-line text-3xl leading-[2.3] tracking-normal text-[#063F30] md:text-4xl" style={QURAN}>
+                <p
+                  className="my-8 whitespace-pre-line text-3xl leading-[2.3] tracking-normal text-[#063F30] md:text-4xl"
+                  style={QURAN}
+                >
                   «{activeItem.textArabic}»
                 </p>
 
@@ -532,23 +1061,42 @@ export default function AdhkarSection() {
                     <span className="absolute -right-3 top-6 grid h-7 w-7 place-items-center rounded-full bg-[#EFF8F3] text-[#7A5A14]">
                       <BadgeCheck size={24} />
                     </span>
-                    <h5 className="mb-2 text-xs font-bold text-[#063F30]">فضل هذا الذكر:</h5>
-                    <p className="text-sm leading-7 text-[#063F30]/85">{activeItem.virtue}</p>
+
+                    <h5 className="mb-2 text-xs font-bold text-[#063F30]">
+                      فضل هذا الذكر:
+                    </h5>
+
+                    <p className="text-sm leading-7 text-[#063F30]/85">
+                      {activeItem.virtue}
+                    </p>
                   </div>
                 )}
               </div>
 
               <div className="mt-8 flex items-center justify-between border-t border-[#E3EEE8] pt-6 text-xs text-[#063F30]/70">
-                <span>{activeItem.reference ? `المصدر: ${activeItem.reference}` : ""}</span>
+                <span>
+                  {activeItem.reference
+                    ? `المصدر: ${activeItem.reference}`
+                    : ""}
+                </span>
+
                 <div className="flex items-center gap-2">
                   <button
                     onClick={toggleSaveActiveItem}
                     aria-label={isActiveSaved ? "إزالة من المحفوظات" : "حفظ الذكر"}
                     title={isActiveSaved ? "إزالة من المحفوظات" : "حفظ الذكر"}
-                    className={`grid h-11 w-11 place-items-center rounded-xl transition hover:bg-[#d4e6dc] ${isActiveSaved ? "bg-[#063F30] text-white" : "bg-[#E3EEE8] text-[#063F30]"}`}
+                    className={`grid h-11 w-11 place-items-center rounded-xl transition hover:bg-[#d4e6dc] ${
+                      isActiveSaved
+                        ? "bg-[#063F30] text-white"
+                        : "bg-[#E3EEE8] text-[#063F30]"
+                    }`}
                   >
-                    <Bookmark size={16} fill={isActiveSaved ? "currentColor" : "none"} />
+                    <Bookmark
+                      size={16}
+                      fill={isActiveSaved ? "currentColor" : "none"}
+                    />
                   </button>
+
                   <button
                     onClick={shareActiveItem}
                     aria-label="مشاركة الذكر"
@@ -571,8 +1119,14 @@ export default function AdhkarSection() {
                 aria-label="اضغط للتسبيح"
                 className="my-6 flex h-[200px] w-[200px] flex-col items-center justify-center rounded-full border-[10px] border-[#E3EEE8] bg-white shadow-[0_0_0_6px_#F0F6F3] transition active:scale-95"
               >
-                <span className="text-6xl font-bold text-[#063F30]">{itemCounter}</span>
-                <span className="mt-1 text-xs font-bold text-[#063F30]">اضغط للتسبيح</span>
+                <span className="text-6xl font-bold text-[#063F30]">
+                  {itemCounter}
+                </span>
+
+                <span className="mt-1 text-xs font-bold text-[#063F30]">
+                  اضغط للتسبيح
+                </span>
+
                 <Hand size={20} className="mt-1 text-[#7A5A14]" />
               </button>
 
@@ -580,8 +1134,13 @@ export default function AdhkarSection() {
                 <span className="block rounded-full bg-[#E3EEE8] px-4 py-1.5 text-xs text-[#063F30]/70">
                   المتبقي: <b className="text-[#063F30]">{times(remaining)}</b>
                 </span>
+
                 <span className="block text-sm text-[#7A5A14]">
-                  {itemCounter === 0 ? "انقر لتبدأ التسبيح" : itemCounter >= repeat ? "تقبّل الله منك، أتممت الذكر" : "واصل التسبيح"}
+                  {itemCounter === 0
+                    ? "انقر لتبدأ التسبيح"
+                    : itemCounter >= repeat
+                    ? "تقبّل الله منك، أتممت الذكر"
+                    : "واصل التسبيح"}
                 </span>
               </div>
             </div>
@@ -593,9 +1152,15 @@ export default function AdhkarSection() {
       <Wrap className="my-12">
         <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
-            <h2 className="text-[28px] font-bold text-[#063F30]">أبواب الأذكار والأدعية المأثورة</h2>
-            <p className="mt-1 text-sm text-[#063F30]/65">موسوعة مصنفة وشاملة من صحيح السُّنّة النبوية والقرآن الكريم</p>
+            <h2 className="text-[28px] font-bold text-[#063F30]">
+              أبواب الأذكار والأدعية المأثورة
+            </h2>
+
+            <p className="mt-1 text-sm text-[#063F30]/65">
+              موسوعة مصنفة وشاملة من صحيح السُّنّة النبوية والقرآن الكريم
+            </p>
           </div>
+
           <div className="flex items-center gap-2">
             {[
               { id: "all", label: `الكل (${categories.length} أبواب)` },
@@ -606,7 +1171,9 @@ export default function AdhkarSection() {
                 key={f.id}
                 onClick={() => setFilter(f.id)}
                 className={`rounded-full px-4 py-1.5 text-[11px] font-bold transition ${
-                  filter === f.id ? "bg-[#063F30] text-white" : "bg-[#E3EEE8] text-[#063F30] hover:bg-[#d4e6dc]"
+                  filter === f.id
+                    ? "bg-[#063F30] text-white"
+                    : "bg-[#E3EEE8] text-[#063F30] hover:bg-[#d4e6dc]"
                 }`}
               >
                 {f.label}
@@ -614,6 +1181,7 @@ export default function AdhkarSection() {
             ))}
           </div>
         </div>
+
         <div className="mb-6 border-t border-[#DCEAE2]" />
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -642,26 +1210,44 @@ export default function AdhkarSection() {
                     <div className={`grid h-10 w-10 place-items-center rounded-xl ${ICON_TONE[meta.iconTone]}`}>
                       <CardIcon size={18} />
                     </div>
+
                     {ui.tag && (
-                      <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${ui.tagTone === "gold" ? "bg-[#FFE9C2] text-[#7A5A14]" : "bg-[#E3EEE8] text-[#063F30]"}`}>
+                      <span
+                        className={`rounded-full px-3 py-1 text-[10px] font-bold ${
+                          ui.tagTone === "gold"
+                            ? "bg-[#FFE9C2] text-[#7A5A14]"
+                            : "bg-[#E3EEE8] text-[#063F30]"
+                        }`}
+                      >
                         {ui.tag}
                       </span>
                     )}
                   </div>
 
-                  <h3 className="text-xl font-bold text-[#063F30]">{cat.nameArabic}</h3>
-                  <p className="mt-2 line-clamp-3 text-xs leading-6 text-[#063F30]/75">{body}</p>
+                  <h3 className="text-xl font-bold text-[#063F30]">
+                    {cat.nameArabic}
+                  </h3>
+
+                  <p className="mt-2 line-clamp-3 text-xs leading-6 text-[#063F30]/75">
+                    {body}
+                  </p>
                 </div>
 
                 <div className="mt-6 flex items-center justify-between border-t border-[#E3EEE8] pt-4">
-                  <span className="text-[11px] font-bold text-[#063F30]/60">{count} {ui.unit}</span>
+                  <span className="text-[11px] font-bold text-[#063F30]/60">
+                    {count} {ui.unit}
+                  </span>
+
                   <button
                     onClick={() => selectCategory(cat.slug)}
                     className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition ${
-                      dark ? "bg-[#063F30] text-white hover:bg-[#084e3c]" : "bg-[#E3EEE8] text-[#063F30] hover:bg-[#d4e6dc]"
+                      dark
+                        ? "bg-[#063F30] text-white hover:bg-[#084e3c]"
+                        : "bg-[#E3EEE8] text-[#063F30] hover:bg-[#d4e6dc]"
                     }`}
                   >
-                    قراءة الأذكار <ArrowLeft size={13} />
+                    قراءة الأذكار
+                    <ArrowLeft size={13} />
                   </button>
                 </div>
               </div>
@@ -675,14 +1261,19 @@ export default function AdhkarSection() {
         <div className="rounded-2xl border border-[#DCEAE2] bg-white p-6 shadow-sm md:p-10">
           <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-start">
             <div>
-              <h2 className="text-2xl font-bold text-[#063F30] md:text-3xl">المسبحة الحرة والعدادات المخصصة</h2>
+              <h2 className="text-2xl font-bold text-[#063F30] md:text-3xl">
+                المسبحة الحرة والعدادات المخصصة
+              </h2>
+
               <p className="mt-1.5 text-xs text-[#063F30]/70 md:text-sm">
                 أوراد سريعة وعدادات مسبقة التجهيز لذكر الله في يومك
               </p>
             </div>
+
             <div className="flex items-center gap-2 rounded-full border border-[#DCEAE2] bg-[#EFF8F3] px-4 py-2 text-[11px] font-bold text-[#063F30]">
               <ClipboardCheck size={14} className="text-[#7A5A14]" />
-              <span>حفظ ومزامنة العدادات يتطلب تسجيل الدخول</span>
+
+              <span>يتم حفظ العدادات تلقائيًا على جهازك</span>
             </div>
           </div>
 
@@ -690,31 +1281,61 @@ export default function AdhkarSection() {
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {tasbihCards.map((card) => {
                 const currentVal = counters[card.id] || 0;
+                const isCustom = card.id.startsWith("custom_");
+
                 return (
                   <div
                     key={card.id}
                     className="flex flex-col justify-between rounded-xl border border-[#E3EEE8] bg-[#F4F9F6] p-5 transition hover:shadow-md"
                   >
                     <div className="mb-6 flex items-center justify-between">
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: card.dotColor }} />
-                      <span className="rounded-full bg-white px-3 py-1 text-[11px] font-bold text-[#063F30] shadow-sm">
-                        {card.target} مرة
-                      </span>
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: card.dotColor }}
+                      />
+
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-white px-3 py-1 text-[11px] font-bold text-[#063F30] shadow-sm">
+                          {card.target} مرة
+                        </span>
+
+                        {isCustom && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCustomCard(card.id)}
+                            aria-label="حذف العداد"
+                            title="حذف العداد"
+                            className="grid h-7 w-7 place-items-center rounded-full bg-red-50 text-red-600 transition hover:bg-red-100"
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    <p className="my-4 text-center text-xl leading-[2.2] tracking-normal text-[#063F30]" style={QURAN}>
+                    <p
+                      className="my-4 text-center text-xl leading-[2.2] tracking-normal text-[#063F30]"
+                      style={QURAN}
+                    >
                       {card.text}
                     </p>
 
                     <div className="mt-4 flex items-center justify-between border-t border-[#E3EEE8] pt-4">
                       <div>
                         {card.label && (
-                          <span className="block max-w-[140px] truncate text-[10px] font-semibold text-[#063F30]/60" title={card.label}>
+                          <span
+                            className="block max-w-[140px] truncate text-[10px] font-semibold text-[#063F30]/60"
+                            title={card.label}
+                          >
                             {card.label}
                           </span>
                         )}
-                        <span className="text-xs font-bold text-[#7A5A14]">{currentVal} / {card.target}</span>
+
+                        <span className="text-xs font-bold text-[#7A5A14]">
+                          {currentVal} / {card.target}
+                        </span>
                       </div>
+
                       <button
                         onClick={() => handleTasbihIncrement(card.id)}
                         aria-label="تسبيح"
@@ -734,11 +1355,18 @@ export default function AdhkarSection() {
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-[#063F30] shadow-sm">
                 <ListPlus size={18} />
               </span>
+
               <div>
-                <h4 className="text-base font-bold text-[#063F30]">هل تريد تخصيص ورد أو ذكر معين؟</h4>
-                <p className="mt-1 text-xs text-[#063F30]/75">أنشئ عدادك الخاص بالعدد المفضل، واضبط التنبيه اليومي المناسب</p>
+                <h4 className="text-base font-bold text-[#063F30]">
+                  هل تريد تخصيص ورد أو ذكر معين؟
+                </h4>
+
+                <p className="mt-1 text-xs text-[#063F30]/75">
+                  أنشئ عدادك الخاص بالعدد المفضل، وتابع تقدمك في كل تسبيحة.
+                </p>
               </div>
             </div>
+
             <button
               onClick={() => setIsModalOpen(true)}
               className="flex items-center gap-2 whitespace-nowrap rounded-xl bg-[#063F30] px-6 py-3 text-xs font-bold text-white shadow transition hover:bg-[#084e3c]"
@@ -750,18 +1378,25 @@ export default function AdhkarSection() {
         </div>
       </Wrap>
 
+      {/* رسالة تأكيد العمليات */}
       {actionMessage && (
-        <div role="status" className="fixed bottom-28 left-1/2 z-[80] -translate-x-1/2 rounded-xl bg-[#063F30] px-5 py-3 text-sm font-bold text-white shadow-xl">
+        <div
+          role="status"
+          className="fixed bottom-28 left-1/2 z-[80] -translate-x-1/2 rounded-xl bg-[#063F30] px-5 py-3 text-sm font-bold text-white shadow-xl"
+        >
           {actionMessage}
         </div>
       )}
 
-      {/* نافذة إنشاء العداد المخصص (Modal) */}
+      {/* نافذة إنشاء العداد المخصص */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl md:p-8">
             <div className="flex items-center justify-between border-b border-[#E3EEE8] pb-4">
-              <h3 className="text-xl font-bold text-[#063F30]">إنشاء عداد ذكر مخصص</h3>
+              <h3 className="text-xl font-bold text-[#063F30]">
+                إنشاء عداد ذكر مخصص
+              </h3>
+
               <button
                 onClick={() => setIsModalOpen(false)}
                 aria-label="إغلاق"
@@ -773,7 +1408,10 @@ export default function AdhkarSection() {
 
             <form onSubmit={handleCreateCustomCard} className="mt-6 space-y-4">
               <div>
-                <label className="mb-2 block text-xs font-bold text-[#063F30]">نص الذكر أو الدعاء:</label>
+                <label className="mb-2 block text-xs font-bold text-[#063F30]">
+                  نص الذكر أو الدعاء:
+                </label>
+
                 <textarea
                   rows={3}
                   required
@@ -787,11 +1425,15 @@ export default function AdhkarSection() {
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-xs font-bold text-[#063F30]">العدد المستهدف للتسبيح:</label>
+                  <label className="mb-2 block text-xs font-bold text-[#063F30]">
+                    العدد المستهدف للتسبيح:
+                  </label>
+
                   <input
                     type="number"
                     min="1"
                     max="1000"
+                    required
                     value={newCardTarget}
                     onChange={(e) => setNewCardTarget(e.target.value)}
                     className="w-full rounded-xl border border-[#DCEAE2] bg-[#F7FCF9] p-3 text-xs text-[#063F30] outline-none focus:border-[#063F30]"
@@ -799,7 +1441,10 @@ export default function AdhkarSection() {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-xs font-bold text-[#063F30]">وسم العداد (التصنيف):</label>
+                  <label className="mb-2 block text-xs font-bold text-[#063F30]">
+                    وسم العداد (التصنيف):
+                  </label>
+
                   <input
                     type="text"
                     value={newCardLabel}
@@ -818,6 +1463,7 @@ export default function AdhkarSection() {
                 >
                   إلغاء
                 </button>
+
                 <button
                   type="submit"
                   className="rounded-xl bg-[#063F30] px-6 py-2.5 text-xs font-bold text-white shadow hover:bg-[#084e3c]"
