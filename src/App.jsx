@@ -1,17 +1,63 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
-import { HomePage } from "./features/Home/HomePage";
-import AdhkarSection from "./features/Home/AdhkarSection";
-import PrayerTimesPage from './components/PrayerTimesPage';
-import AhadithHomePage from "./components/Ahadees/AhadithHomePage";
-import TafseerHomePage from "./components/TafseerAhadith/TafseerHomePage";
-import RamadanPage from './features/ramadan/RamadanPage';
-import TafseerPage from './features/tafseer/TafseerPage';
-import QuranPage from "./features/Quran/QuranPage";
-import ShortsPage from "./features/Shorts/ShortsPage";
-import DownloadsPage from "./features/Downloads/DownloadsPage";
-import { AudioProvider } from './context/AudioContext';
-import AudioPlayer from './components/AudioPlayer';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+
+import { lazy, Suspense, useEffect } from "react";
+
+import { AudioProvider } from "./context/AudioContext";
+import AudioPlayer from "./components/AudioPlayer";
+
+// Lazy Loading
+const HomePage = lazy(() =>
+  import("./features/Home/HomePage").then((module) => ({
+    default: module.HomePage,
+  }))
+);
+
+const AdhkarSection = lazy(() =>
+  import("./features/Home/AdhkarSection")
+);
+
+const PrayerTimesPage = lazy(() =>
+  import("./components/PrayerTimesPage")
+);
+
+const AhadithHomePage = lazy(() =>
+  import("./components/Ahadees/AhadithHomePage")
+);
+
+const TafseerHomePage = lazy(() =>
+  import("./components/TafseerAhadith/TafseerHomePage")
+);
+
+const RamadanPage = lazy(() =>
+  import("./features/ramadan/RamadanPage")
+);
+
+const TafseerPage = lazy(() =>
+  import("./features/tafseer/TafseerPage")
+);
+
+const QuranPage = lazy(() =>
+  import("./features/Quran/QuranPage")
+);
+
+const ShortsPage = lazy(() =>
+  import("./features/Shorts/ShortsPage")
+);
+
+const DownloadsPage = lazy(() =>
+  import("./features/Downloads/DownloadsPage")
+);
+
+const NotFound = lazy(() =>
+  import("./features/NotFound/NotFound")
+);
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -28,6 +74,7 @@ function HashRedirect() {
 
   useEffect(() => {
     const hash = window.location.hash.replace(/^#\/?/, "").toLowerCase();
+
     if (hash === "adhkar" || hash === "azkar") {
       navigate("/adhkar", { replace: true });
     } else if (hash === "tafsir" || hash === "tafseer") {
@@ -40,32 +87,44 @@ function HashRedirect() {
   return null;
 }
 
+function Loading() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <p>جاري تحميل الصفحة...</p>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <AudioProvider>
       <BrowserRouter>
         <ScrollToTop />
         <HashRedirect />
+
         <div className="min-h-screen flex flex-col pb-36 md:pb-40">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/home" element={<Navigate to="/" replace />} />
-            <Route path="/adhkar" element={<AdhkarSection />} />
-            <Route path="/azkar" element={<Navigate to="/adhkar" replace />} />
-            <Route path="/prayers" element={<PrayerTimesPage />} />
-            <Route path="/ahadith" element={<AhadithHomePage />} />
-            <Route path="/tafseerhadith/:order?" element={<TafseerHomePage />} />
-            <Route path="/tafseerhadith" element={<TafseerHomePage />} />
-            <Route path="/ramadan" element={<RamadanPage />} />
-            <Route path="/tafseer" element={<TafseerPage />} />
-            <Route path="/tafsir" element={<Navigate to="/tafseer" replace />} />
-            <Route path="/quran" element={<QuranPage />} />
-            <Route path="/quran/*" element={<QuranPage />} />
-            <Route path="/shorts" element={<ShortsPage />} />
-            <Route path="/downloads" element={<DownloadsPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          <Suspense fallback={<Loading />}>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/home" element={<Navigate to="/" replace />} />
+              <Route path="/adhkar" element={<AdhkarSection />} />
+              <Route path="/azkar" element={<Navigate to="/adhkar" replace />} />
+              <Route path="/prayers" element={<PrayerTimesPage />} />
+              <Route path="/ahadith" element={<AhadithHomePage />} />
+              <Route path="/tafseerhadith/:order?" element={<TafseerHomePage />} />
+              <Route path="/tafseerhadith" element={<TafseerHomePage />} />
+              <Route path="/ramadan" element={<RamadanPage />} />
+              <Route path="/tafseer" element={<TafseerPage />} />
+              <Route path="/tafsir" element={<Navigate to="/tafseer" replace />} />
+              <Route path="/quran" element={<QuranPage />} />
+              <Route path="/quran/*" element={<QuranPage />} />
+              <Route path="/shorts" element={<ShortsPage />} />
+              <Route path="/downloads" element={<DownloadsPage />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </div>
+
         <AudioPlayer />
       </BrowserRouter>
     </AudioProvider>

@@ -5,7 +5,6 @@ import DailyHadith from "./DailyHadith";
 import HadithTopics from "./HadithTopics";
 import HadithFooter from "./HadithFooter";
 import { useDailyHadith, useHadiths, useSavedHadiths } from "./hadithData";
-import { useHadithSpeech } from "./useHadithSpeech";
 
 const FONTS =
   "https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Tajawal:wght@400;500;700;800&display=swap";
@@ -18,18 +17,13 @@ export function AhadithHomePage() {
   const { hadiths, loading, error, retry } = useHadiths();
   const daily = useDailyHadith(hadiths);
   const [savedIds, toggleSaved] = useSavedHadiths();
-  const speech = useHadithSpeech();
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("all"); // all | saved | اسم المصدر
-
+  const [filter, setFilter] = useState("all");
 
   const openHadith = useCallback(
     (hadith) => navigate(`/tafseerhadith/${hadith.sortOrder}`),
     [navigate]
   );
-
-
-  const playHadith = (hadith) => speech.play(hadith, hadiths);
 
   const discover = () => {
     daily.another();
@@ -54,6 +48,7 @@ export function AhadithHomePage() {
     <div className="pb-28 bg-[#FAF9F6] min-h-screen">
       <link href={FONTS} rel="stylesheet" />
       <Navbar />
+
       <DailyHadith
         hadith={daily.hadith}
         total={total}
@@ -70,9 +65,8 @@ export function AhadithHomePage() {
         saved={daily.hadith ? savedIds.includes(daily.hadith.sortOrder) : false}
         onToggleSaved={toggleSaved}
         onOpen={openHadith}
-        onPlay={playHadith}
-        speech={speech}
       />
+
       <HadithTopics
         hadiths={hadiths}
         loading={loading}
@@ -84,9 +78,8 @@ export function AhadithHomePage() {
         savedIds={savedIds}
         onToggleSaved={toggleSaved}
         onOpen={openHadith}
-        onPlay={playHadith}
-        speech={speech}
       />
+
       <HadithFooter
         onDiscover={discover}
         onBrowseAll={browseAll}

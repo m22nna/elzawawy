@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { RefreshCw, Bookmark, Sparkles } from 'lucide-react';
 import { arNum } from '../../features/Quran/utils';
 
-const DEFAULT_BG = "url('/images/prayer-bg.png')";
+const DEFAULT_BG = "url('/images/prayer-bg.webp')";
 const STRIP_KEY = 'zawawy:hadiths:strip';
 
 const readClosed = () => {

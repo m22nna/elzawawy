@@ -2,7 +2,6 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useMemo } from "react";
 import Navbar from "../NavBar";
 import { useDailyHadith, useHadiths, useSavedHadiths } from "../Ahadees/hadithData";
-import { useHadithSpeech } from "../Ahadees/useHadithSpeech";
 import HadithDetails from "./HadithDetailes";
 import HadithExplanation from "./HadithExplanation";
 import RelatedAhadith from "./RelatedAhadith";
@@ -43,31 +42,38 @@ const TafseerHomePage = () => {
   const { hadiths, loading, error, retry } = useHadiths();
   const daily = useDailyHadith(hadiths);
   const [savedIds, toggleSaved] = useSavedHadiths();
-  const speech = useHadithSpeech();
 
   const total = hadiths?.length ?? 0;
+
   const index = useMemo(
     () => (hadiths && order ? hadiths.findIndex((h) => h.sortOrder === Number(order)) : -1),
     [hadiths, order]
   );
+
   const hadith = index >= 0 ? hadiths[index] : null;
   const prev = index > 0 ? hadiths[index - 1] : null;
   const next = index >= 0 && index < total - 1 ? hadiths[index + 1] : null;
 
-
   const related = useMemo(() => {
     if (!hadiths || index < 0) return [];
+
     const out = [];
-    for (let k = 1; k < total && out.length < RELATED_COUNT; k += 1) out.push(hadiths[(index + k) % total]);
+
+    for (let k = 1; k < total && out.length < RELATED_COUNT; k += 1) {
+      out.push(hadiths[(index + k) % total]);
+    }
+
     return out;
   }, [hadiths, index, total]);
 
   const open = (h) => navigate(`/tafseerhadith/${h.sortOrder}`);
 
-
-  if (!order && daily.hadith) return <Navigate to={`/tafseerhadith/${daily.hadith.sortOrder}`} replace />;
+  if (!order && daily.hadith) {
+    return <Navigate to={`/tafseerhadith/${daily.hadith.sortOrder}`} replace />;
+  }
 
   let body;
+
   if (loading || (!order && !error)) {
     body = <Skeleton />;
   } else if (error) {
@@ -96,16 +102,25 @@ const TafseerHomePage = () => {
           total={total}
           saved={savedIds.includes(hadith.sortOrder)}
           onToggleSaved={toggleSaved}
-          speech={{ ...speech, play: (h) => speech.play(h, hadiths) }}
         />
-        <HadithExplanation hadith={hadith} prev={prev} next={next} onOpen={open} />
+
+        <HadithExplanation
+          hadith={hadith}
+          prev={prev}
+          next={next}
+          onOpen={open}
+        />
+
         <RelatedAhadith related={related} onOpen={open} />
       </>
     );
   }
 
   return (
-    <div className="pb-28 bg-[#FAF8F5] text-[#2C3E35] min-h-screen" style={{ fontFamily: "'Tajawal', sans-serif" }}>
+    <div
+      className="pb-28 bg-[#FAF8F5] text-[#2C3E35] min-h-screen"
+      style={{ fontFamily: "'Tajawal', sans-serif" }}
+    >
       <Navbar />
       {body}
     </div>

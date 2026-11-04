@@ -8,10 +8,13 @@ const SAVED_KEY = "zawawy:hadiths:saved";
 const normalize = (raw) =>
   (Array.isArray(raw) ? raw : raw?.data ?? [])
     .map((h, i) => ({
+      id: h.id,
       textArabic: h.textArabic ?? "",
       source: h.source ?? "",
       explanation: h.explanation ?? "",
-      sortOrder: Number(h.sortOrder) || i + 1, // ترتيب الحديث في المكتبة (مش رقمه في الكتاب)
+      sortOrder: Number.isFinite(Number(h.sortOrder))
+        ? Number(h.sortOrder)
+        : i + 1,
     }))
     .filter((h) => h.textArabic)
     .sort((a, b) => a.sortOrder - b.sortOrder);

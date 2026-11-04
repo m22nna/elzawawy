@@ -62,3 +62,29 @@ export function subscribeProgress(cb) {
 
 export const doneCount = (p, slug) =>
   Array.isArray(p.done?.[slug]) ? p.done[slug].length : 0;
+
+
+
+export function saveItemCount(slug, index, count) {
+  const p = loadProgress();
+
+  saveProgress({
+    ...p,
+    counts: {
+      ...p.counts,
+      [slug]: {
+        ...(p.counts?.[slug] || {}),
+        [index]: count,
+      },
+    },
+  });
+
+  try {
+    window.dispatchEvent(new Event("wird:update"));
+  } catch {}
+}
+
+export function getItemCount(slug, index) {
+  const p = loadProgress();
+  return p.counts?.[slug]?.[index] ?? 0;
+}

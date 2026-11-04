@@ -1,29 +1,36 @@
 /**
  * Tafsir Service
- * Connects with Zawawy API staging for Quran Surahs, Ayahs, and Tafsir data.
+ * Connects with Zawawy API staging for Quran Surahs, Ayahs, Tafsir, and Recitations.
  */
 
-const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || 'https://zawawy-api-staging.onrender.com').replace(/\/+$/, '');
+const API_BASE_URL = (
+  import.meta.env?.VITE_API_BASE_URL ||
+  'https://zawawy-api-staging.onrender.com'
+).replace(/\/+$/, '');
 
-// Cache objects for rapid in-memory navigation without redundant network requests
 const surahCache = {
   surahs: null,
   ayahsBySurah: {},
   tafsirCache: {},
+  recitations: null,
 };
 
 /**
  * Arabic Eastern Numeral Converter
- * Converts Western digits (0-9) to Eastern Arabic digits (٠-٩)
  */
 export const toArabicNumerals = (num) => {
   if (num === null || num === undefined || num === '') return '';
+
   const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-  return String(num).replace(/[0-9]/g, (digit) => arabicDigits[Number(digit)]);
+
+  return String(num).replace(
+    /[0-9]/g,
+    (digit) => arabicDigits[Number(digit)]
+  );
 };
 
 /**
- * Standard Tafsir Sources
+ * Supported Tafsir Sources
  */
 export const TAFSIR_SOURCES = [
   {
@@ -34,62 +41,36 @@ export const TAFSIR_SOURCES = [
     edition: 'طبعة مجمع الملك فهد بالمدينة المنورة',
     isDefault: true,
   },
-  {
-    id: 'saadi',
-    name: 'تفسير السعدي',
-    fullName: 'تيسير الكريم الرحمن في تفسير كلام المنان — للعلامة عبدالرحمن بن ناصر السعدي',
-    author: 'الشيخ عبدالرحمن بن ناصر السعدي (رحمه الله)',
-    edition: 'طبعة دار ابن الجوزي',
-    isDefault: false,
-  },
-  {
-    id: 'ibnkathir',
-    name: 'تفسير ابن كثير',
-    fullName: 'تفسير القرآن العظيم — للإمام الحافظ إسماعيل بن عمر بن كثير',
-    author: 'الحافظ عماد الدين إسماعيل بن كثير (رحمه الله)',
-    edition: 'طبعة دار طيبة',
-    isDefault: false,
-  },
-  {
-    id: 'tabari',
-    name: 'تفسير الطبري',
-    fullName: 'جامع البيان عن تأويل آي القرآن — للإمام أبي جعفر محمد بن جرير الطبري',
-    author: 'الإمام محمد بن جرير الطبري (رحمه الله)',
-    edition: 'طبعة دار هجر',
-    isDefault: false,
-  },
-  {
-    id: 'qurtubi',
-    name: 'تفسير القرطبي',
-    fullName: 'الجامع لأحكام القرآن والمبين لما تضمنه من السنة وآي الفرقان',
-    author: 'الإمام شمس الدين أبو عبد الله القرطبي (رحمه الله)',
-    edition: 'طبعة دار الكتب المصرية',
-    isDefault: false,
-  },
 ];
 
 /**
- * Helper to execute API requests with fallback for /v1 and /api/v1
+ * Helper to execute API requests with fallback for /api/v1
  */
 async function requestApi(endpoint) {
-  // Normalize leading slash
-  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const cleanEndpoint = endpoint.startsWith('/')
+    ? endpoint
+    : `/${endpoint}`;
 
-  // Try direct endpoint first (e.g. /v1/...)
-  let url = `${API_BASE_URL}${cleanEndpoint}`;
+  const url = `${API_BASE_URL}${cleanEndpoint}`;
+
   try {
     const res = await fetch(url);
+
     if (res.ok) {
       return await res.json();
     }
-    // If 404 and doesn't contain /api/v1, attempt /api prefix
+
     if (res.status === 404 && !cleanEndpoint.startsWith('/api')) {
       const altUrl = `${API_BASE_URL}/api${cleanEndpoint}`;
       const altRes = await fetch(altUrl);
+
       if (altRes.ok) {
         return await altRes.json();
       }
+
+      throw new Error(`API Error: ${altRes.status} ${altRes.statusText}`);
     }
+
     throw new Error(`API Error: ${res.status} ${res.statusText}`);
   } catch (error) {
     console.error(`Request failed for ${url}:`, error);
@@ -98,7 +79,7 @@ async function requestApi(endpoint) {
 }
 
 /**
- * Fetch all 114 Surahs with metadata
+ * Fetch all Surahs
  */
 export async function getSurahs() {
   if (surahCache.surahs) {
@@ -107,7 +88,9 @@ export async function getSurahs() {
 
   try {
     const data = await requestApi('/v1/quran/surahs');
+
     surahCache.surahs = data;
+
     return data;
   } catch (err) {
     console.error('Failed to fetch surahs:', err);
@@ -120,13 +103,16 @@ export async function getSurahs() {
  */
 export async function getSurahAyahs(surahId) {
   const sid = Number(surahId);
+
   if (surahCache.ayahsBySurah[sid]) {
     return surahCache.ayahsBySurah[sid];
   }
 
   try {
     const data = await requestApi(`/v1/quran/surahs/${sid}/ayahs`);
+
     surahCache.ayahsBySurah[sid] = data;
+
     return data;
   } catch (err) {
     console.error(`Failed to fetch ayahs for surah ${sid}:`, err);
@@ -136,112 +122,173 @@ export async function getSurahAyahs(surahId) {
 
 /**
  * Fetch Tafsir for a specific Surah and Ayah
- * @param {number|string} surahId - 1-114
- * @param {number|string} ayahNumber - 1-N
- * @param {string} source - tafsir source id (default: 'ar.muyassar')
  */
-export async function getAyahTafsir(surahId, ayahNumber, source = 'ar.muyassar') {
+export async function getAyahTafsir(surahId, ayahNumber) {
   const sid = Number(surahId);
   const aid = Number(ayahNumber);
-  const cacheKey = `${sid}:${aid}:${source}`;
+  const cacheKey = `${sid}:${aid}`;
 
   if (surahCache.tafsirCache[cacheKey]) {
     return surahCache.tafsirCache[cacheKey];
   }
 
   try {
-    // API provides Tafsir al-Muyassar at /v1/tafsir/{surahId}/{ayahNumber}
     const data = await requestApi(`/v1/tafsir/${sid}/${aid}`);
+
     const result = {
       ...data,
       surahId: Number(data.surahId ?? sid),
       ayahNumber: Number(data.ayahNumber ?? aid),
-      source: data.source || source,
+      source: 'ar.muyassar',
       text: data.text || '',
     };
+
     surahCache.tafsirCache[cacheKey] = result;
+
     return result;
   } catch (err) {
-    console.error(`Failed to fetch tafsir for Surah ${sid}, Ayah ${aid}:`, err);
+    console.error(
+      `Failed to fetch tafsir for Surah ${sid}, Ayah ${aid}:`,
+      err
+    );
+
     throw err;
   }
 }
 
 /**
- * Get available Tafsir sources list
+ * Fetch available recitations
+ */
+export async function getRecitations() {
+  if (surahCache.recitations) {
+    return surahCache.recitations;
+  }
+
+  try {
+    const data = await requestApi('/v1/recitations');
+
+    if (!Array.isArray(data)) {
+      throw new Error('Invalid recitations response');
+    }
+
+    surahCache.recitations = data;
+
+    return data;
+  } catch (err) {
+    console.error('Failed to fetch recitations:', err);
+    throw err;
+  }
+}
+
+/**
+ * Get available Tafsir sources
  */
 export function getTafsirSources() {
   return TAFSIR_SOURCES;
 }
 
 /**
- * Normalize Arabic text by removing tashkeel / diacritics and unifying letters
+ * Normalize Arabic text
  */
 export const normalizeArabic = (text) => {
   if (!text) return '';
+
   return String(text)
-    .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, '') // remove Arabic diacritics / Quranic marks
+    .normalize('NFKC')
+    .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, '')
     .replace(/[إأآٱ]/g, 'ا')
     .replace(/ة/g, 'ه')
     .replace(/ى/g, 'ي')
-    .replace(/ؤ/g, 'و')
-    .replace(/ئ/g, 'ي')
+    .replace(/[ؤئ]/g, '')
+    .replace(/[۞۩ـ]/g, '')
+    .replace(/[^\u0621-\u064A0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
 };
 
 /**
- * Search Tafsir and Quranic Texts
- * @param {string} query
- * @param {number} [surahId]
+ * Search across all Quran Surahs and Ayahs
  */
 export async function searchTafsir(query, surahId = null) {
   if (!query || !query.trim()) return [];
-  const normalizedQuery = normalizeArabic(query).replace(/^سوره\s+/, '').trim();
+
+  const normalizedQuery = normalizeArabic(query)
+    .replace(/^سوره\s+/, '')
+    .trim();
+
+  if (!normalizedQuery) return [];
 
   try {
+    const surahs = await getSurahs();
     const results = [];
 
-    // 1. If surahId is provided, search within its ayahs first
-    if (surahId) {
-      const ayahs = await getSurahAyahs(surahId);
-      const matchedAyahs = ayahs.filter(a => {
-        if (!a.textUthmani) return false;
-        return normalizeArabic(a.textUthmani).includes(normalizedQuery);
-      });
+    // Search Surah names
+    const matchedSurahs = surahs.filter((surah) => {
+      const arabicName = normalizeArabic(surah.nameArabic || '');
+      const englishName = (surah.nameEnglish || '').toLowerCase();
 
-      matchedAyahs.forEach(a => {
-        results.push({
-          type: 'ayah',
-          surahId: Number(surahId),
-          ayahNumber: Number(a.ayahNumber),
-          textUthmani: a.textUthmani,
-        });
+      return (
+        arabicName.includes(normalizedQuery) ||
+        englishName.includes(normalizedQuery.toLowerCase())
+      );
+    });
+
+    matchedSurahs.forEach((surah) => {
+      results.push({
+        type: 'surah',
+        surahId: Number(surah.id),
+        surahNameArabic: surah.nameArabic,
+        nameArabic: surah.nameArabic,
+        ayahCount: surah.ayahCount,
+      });
+    });
+
+    // Search Quranic text in all Surahs
+    const batchSize = 8;
+
+    for (let i = 0; i < surahs.length; i += batchSize) {
+      const batch = surahs.slice(i, i + batchSize);
+
+      const batchResults = await Promise.all(
+        batch.map(async (surah) => {
+          try {
+            const ayahs = await getSurahAyahs(surah.id);
+
+            return ayahs
+              .filter((ayah) => {
+                if (!ayah.textUthmani) return false;
+
+                return normalizeArabic(ayah.textUthmani).includes(
+                  normalizedQuery
+                );
+              })
+              .map((ayah) => ({
+                type: 'ayah',
+                surahId: Number(surah.id),
+                surahNameArabic: surah.nameArabic,
+                ayahNumber: Number(ayah.ayahNumber),
+                textUthmani: ayah.textUthmani,
+              }));
+          } catch (error) {
+            console.error(
+              `Failed to search in Surah ${surah.id}:`,
+              error
+            );
+
+            return [];
+          }
+        })
+      );
+
+      batchResults.forEach((matches) => {
+        results.push(...matches);
       });
     }
 
-    // 2. Also search across surah names
-    const surahs = await getSurahs();
-    const matchedSurahs = surahs.filter(s => {
-      const sNorm = normalizeArabic(s.nameArabic);
-      const sEng = (s.nameEnglish || '').toLowerCase();
-      return sNorm.includes(normalizedQuery) || sEng.includes(normalizedQuery.toLowerCase());
-    });
-
-    matchedSurahs.forEach(s => {
-      results.push({
-        type: 'surah',
-        surahId: Number(s.id),
-        nameArabic: s.nameArabic,
-        ayahCount: s.ayahCount,
-      });
-    });
-
     return results;
   } catch (err) {
-    console.error('Failed to search tafsir:', err);
-    return [];
+    console.error('Failed to search Quran:', err);
+    throw err;
   }
 }
-
