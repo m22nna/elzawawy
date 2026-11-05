@@ -5,6 +5,7 @@ import { downloadManager } from "../features/Downloads/downloadManager";
 import { useAudio } from "../features/Home/audio/AudioContext";
 import { useFeaturedAudio } from "../features/Home/hooks/useFeaturedAudio";
 import Waveform from "./ui/Waveform";
+import { Link } from "react-router-dom";
 
 const fmt = (s) =>
   s
@@ -135,6 +136,7 @@ export default function FeaturedAudio() {
     <section
       dir="rtl"
       lang="ar"
+      id="recitations"
       className="w-full bg-wird-mist px-4 pb-8 pt-10 font-body sm:px-6 sm:pt-12 lg:px-8 xl:px-10 2xl:px-12"
     >
       <div className="mx-auto w-full max-w-none">
@@ -155,13 +157,13 @@ export default function FeaturedAudio() {
             </p>
           </div>
 
-          <a
-            href="/audio"
+          <Link
+            to="/audio"
             className="flex w-fit shrink-0 items-center gap-2 rounded-full px-3 py-2 text-xs font-bold text-wird-green transition hover:bg-wird-card hover:underline"
           >
             <ArrowLeft size={15} />
             تصفح كافة الصوتيات
-          </a>
+          </Link>
         </header>
 
         {/* Audio Cards */}
