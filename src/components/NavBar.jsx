@@ -30,6 +30,7 @@ const Navbar = () => {
     pathname.startsWith('/tafseerhadith/');
 
   const isShorts = pathname.startsWith('/shorts');
+  const isRamadan = pathname.startsWith('/ramadan');
 
   const prayer = usePrayerTimes();
   const imgRef = useRef(null);
@@ -60,6 +61,7 @@ const Navbar = () => {
     { to: '/ahadith', label: 'الأحاديث', active: isAhadith },
     { to: '/adhkar', label: 'الأذكار', active: isAdhkar },
     { to: '/tafseer', label: 'التفاسير', active: isTafseer },
+    { to: '/ramadan', label: 'رمضان', active: isRamadan },
     { to: '/shorts', label: 'مقاطع قصيرة', active: isShorts },
   ];
 

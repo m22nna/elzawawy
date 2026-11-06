@@ -55,14 +55,14 @@ const QUICK_LINKS = [
     iconColor: "#244fd0",
     bg: "#eef4ff",
   },
-  {
-    title: "المحفوظات",
-    subtitle: "الصفحات والمقاطع",
-    href: "/bookmarks",
-    Icon: Bookmark,
-    iconColor: "#087747",
-    bg: "#effcf4",
-  },
+  // {
+  //   title: "المحفوظات",
+  //   subtitle: "الصفحات والمقاطع",
+  //   href: "/bookmarks",
+  //   Icon: Bookmark,
+  //   iconColor: "#087747",
+  //   bg: "#effcf4",
+  // },
   {
     title: "مواقيت الصلاة",
     subtitle: "حسب موقعك",
@@ -347,7 +347,7 @@ const QuickDashboard = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8 xl:gap-4 2xl:gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4">
             {QUICK_LINKS.map(
               ({ title, subtitle, href, Icon, iconColor, bg }) => {
                 // نحدد ما إذا كان الرابط مسار داخلي مثل /prayers أو رابط عادي

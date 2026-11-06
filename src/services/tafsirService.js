@@ -195,7 +195,12 @@ export const normalizeArabic = (text) => {
 
   return String(text)
     .normalize('NFKC')
-    .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, '')
+    // Preserve Uthmani small letters as their corresponding letters
+    .replace(/\u0670/g, 'ا') // Superscript Alef
+    .replace(/\u06E5/g, 'و') // Small Waw
+    .replace(/\u06E6/g, 'ي') // Small Yeh
+    // Remove tashkeel and Quranic annotation marks
+    .replace(/[\u064B-\u065F\u06D6-\u06ED]/g, '')
     .replace(/[إأآٱ]/g, 'ا')
     .replace(/ة/g, 'ه')
     .replace(/ى/g, 'ي')
@@ -206,7 +211,6 @@ export const normalizeArabic = (text) => {
     .trim()
     .toLowerCase();
 };
-
 /**
  * Search across all Quran Surahs and Ayahs
  */

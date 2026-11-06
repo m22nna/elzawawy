@@ -273,8 +273,16 @@ const handleSearch = async () => {
 
   const trimmed = searchQuery.trim();
 
-  const term = normalizeArabic(trimmed)
+  // Arabic normalization
+  const arabicTerm = normalizeArabic(trimmed)
     .replace(/^سوره\s+/, '')
+    .trim();
+
+  // English normalization
+  const englishTerm = trimmed
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
     .trim();
 
   setIsSearching(true);
@@ -282,15 +290,27 @@ const handleSearch = async () => {
   setSearchResults(null);
 
   try {
+    // Search for a surah only when the normalized term is not empty
     const matchedSurah = surahs.find((s) => {
-      const sNorm = normalizeArabic(s.nameArabic);
-      const sEng = (s.nameEnglish || '').toLowerCase();
+      const sNorm = normalizeArabic(s.nameArabic || '');
 
-      return (
-        sNorm === term ||
-        sNorm.includes(term) ||
-        sEng === term.toLowerCase()
-      );
+      const sEng = (s.nameEnglish || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      const arabicMatch =
+        arabicTerm.length > 0 &&
+        sNorm.length > 0 &&
+        (sNorm === arabicTerm || sNorm.includes(arabicTerm));
+
+      const englishMatch =
+        englishTerm.length > 0 &&
+        sEng.length > 0 &&
+        (sEng === englishTerm || sEng.includes(englishTerm));
+
+      return arabicMatch || englishMatch;
     });
 
     if (matchedSurah) {
@@ -300,6 +320,17 @@ const handleSearch = async () => {
 
       setSearchMessage(
         `تم الانتقال تلقائياً إلى سورة ${matchedSurah.nameArabic}`
+      );
+
+      return;
+    }
+
+    // Search inside Tafseer only for Arabic queries
+    if (!arabicTerm) {
+      setSearchResults([]);
+
+      setSearchMessage(
+        `لم يتم العثور على سورة مطابقة لـ "${trimmed}".`
       );
 
       return;
@@ -334,7 +365,6 @@ const handleSearch = async () => {
     }
   } catch (err) {
     console.error('Search error:', err);
-
     setSearchMessage('حدث خطأ أثناء إجراء البحث.');
   } finally {
     setIsSearching(false);

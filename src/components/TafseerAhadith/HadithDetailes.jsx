@@ -13,7 +13,16 @@ import { arNum } from "../../features/Quran/utils";
 const FONT_MIN = 20;
 const FONT_MAX = 40;
 
-const HadithDetails = ({ hadith, total, saved, onToggleSaved }) => {
+const HadithDetails = ({
+  hadith,
+  total,
+  displayIndex,
+  saved,
+  onToggleSaved,
+}) => {
+
+
+
   const navigate = useNavigate();
   const [fontSize, setFontSize] = useState(28);
   const [copied, setCopied] = useState(false);
@@ -237,8 +246,7 @@ const HadithDetails = ({ hadith, total, saved, onToggleSaved }) => {
 
                 <Meta
                   label="ترتيبه في المكتبة"
-                  value={`${arNum(hadith.sortOrder)} من ${arNum(total)}`}
-                />
+                      value={`${arNum(displayIndex)} من ${arNum(total)}`}                />
               </div>
             </div>
           </div>

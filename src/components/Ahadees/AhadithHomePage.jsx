@@ -44,6 +44,10 @@ export function AhadithHomePage() {
 
   const total = hadiths?.length ?? 0;
 
+  const dailyIndex = daily.hadith
+  ? hadiths.findIndex((h) => h.sortOrder === daily.hadith.sortOrder)
+  : -1;
+
   return (
     <div className="pb-28 bg-[#FAF9F6] min-h-screen">
       <link href={FONTS} rel="stylesheet" />
@@ -56,6 +60,7 @@ export function AhadithHomePage() {
         error={error}
         onRetry={retry}
         isDailyPick={daily.isDailyPick}
+        displayIndex={dailyIndex + 1}
         query={query}
         onQuery={(q) => {
           setQuery(q);
