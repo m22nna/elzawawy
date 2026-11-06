@@ -51,6 +51,28 @@ export const PLACES = [
 ];
 export const DEFAULT_PLACE = PLACES[0];
 
+export const PLACE_KEY = 'zawawy:prayer:place';
+
+export function loadSavedPlace() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PLACE_KEY));
+
+    if (
+      saved &&
+      saved.lat &&
+      saved.lng &&
+      saved.tz &&
+      isValidTz(saved.tz)
+    ) {
+      return saved;
+    }
+  } catch (error) {
+    console.error('Could not load saved prayer place:', error);
+  }
+
+  return DEFAULT_PLACE;
+}
+
 // لو المستخدم استخدم "موقعي الحالي" بنخمّن الدولة من المنطقة الزمنية (غير كده بتتحسب برابطة العالم الإسلامي)
 export const COUNTRY_BY_TZ = {
   'Africa/Cairo': 'EG',

@@ -183,31 +183,37 @@ const Hero = ({ bgImageUrl }) => {
                   <span>مواقيت الصلاة</span>
                 </div>
 
-                <span className="text-[11px] text-gray-400">
-                  الإسكندرية
-                </span>
+               <span className="text-[11px] text-gray-400">
+  {prayer?.placeName || 'القاهرة'}
+</span>
               </div>
 
               {PRAYER_ROWS.map(([key, name]) => {
-                const active = prayer?.next?.key === key;
-                return (
-                  <div
-                    key={key}
-                    className={
-                      active
-                        ? 'flex justify-between items-center bg-[#b8860b]/35 border border-[#c69234]/50 text-[#fef08a] px-3 py-1.5 rounded-lg font-bold shadow-sm'
-                        : 'flex justify-between items-center py-1 px-1.5 font-medium'
-                    }
-                  >
-                    <span className={active ? '' : 'text-gray-300'}>
-                      {active ? `• ${name} (التالية)` : name}
-                    </span>
-                    <span className={active ? '' : 'text-white font-semibold'}>
-                      {formatTime(prayerTimes?.[key])}
-                    </span>
-                  </div>
-                );
-              })}
+  const active = prayer?.next?.key === key;
+
+  const displayTime = active
+    ? prayer.next.iso
+    : prayerTimes?.[key];
+
+  return (
+    <div
+      key={key}
+      className={
+        active
+          ? 'flex justify-between items-center bg-[#b8860b]/35 border border-[#c69234]/50 text-[#fef08a] px-3 py-1.5 rounded-lg font-bold shadow-sm'
+          : 'flex justify-between items-center py-1 px-1.5 font-medium'
+      }
+    >
+      <span className={active ? '' : 'text-gray-300'}>
+        {active ? `• ${name} (التالية)` : name}
+      </span>
+
+      <span className={active ? '' : 'text-white font-semibold'}>
+        {formatTime(displayTime)}
+      </span>
+    </div>
+  );
+})}
 
             </div>
           </div>

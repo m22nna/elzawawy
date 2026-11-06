@@ -51,6 +51,11 @@ const TafseerHomePage = () => {
   );
 
   const hadith = index >= 0 ? hadiths[index] : null;
+
+
+
+  
+
   const prev = index > 0 ? hadiths[index - 1] : null;
   const next = index >= 0 && index < total - 1 ? hadiths[index + 1] : null;
 
@@ -98,11 +103,12 @@ const TafseerHomePage = () => {
     body = (
       <>
         <HadithDetails
-          hadith={hadith}
-          total={total}
-          saved={savedIds.includes(hadith.sortOrder)}
-          onToggleSaved={toggleSaved}
-        />
+  hadith={hadith}
+  total={total}
+  displayIndex={index + 1}
+  saved={savedIds.includes(hadith.sortOrder)}
+  onToggleSaved={toggleSaved}
+/>
 
         <HadithExplanation
           hadith={hadith}

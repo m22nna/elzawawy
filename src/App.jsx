@@ -64,6 +64,10 @@ const AudioLibraryPage = lazy(() =>
   import("./features/Audio/AudioLibraryPage")
 );
 
+const SearchPage = lazy(() =>
+  import("./features/Search/SearchPage")
+);
+
 function ScrollToTop() {
   const { pathname } = useLocation();
 
@@ -126,6 +130,7 @@ export default function App() {
               <Route path="/shorts" element={<ShortsPage />} />
               <Route path="/downloads" element={<DownloadsPage />} />
               <Route path="/audio" element={<AudioLibraryPage />} />
+              <Route path="/search" element={<SearchPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

@@ -232,6 +232,8 @@ const HadithTopics = ({
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5" dir="rtl">
               {list.slice(0, visible).map((h) => {
+                const displayIndex = hadiths.findIndex(
+                 (item) => item.sortOrder === h.sortOrder) + 1;
                 const saved = savedIds.includes(h.sortOrder);
                 const bucket = bucketOf(h.source);
 
@@ -248,7 +250,7 @@ const HadithTopics = ({
                       </span>
 
                       <span className="text-[10px] font-bold px-2.5 py-1 rounded-md border border-[#BFE6D3] bg-[#F1FBF6] text-[#0D7D4D]">
-                        حديث {arNum(h.sortOrder)}
+                        حديث {arNum(displayIndex)}
                       </span>
                     </div>
 

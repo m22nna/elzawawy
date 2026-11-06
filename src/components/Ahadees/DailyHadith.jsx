@@ -7,6 +7,7 @@ const DailyHadith = ({
   hadith,
   total = 0,
   loading,
+  displayIndex,
   error,
   onRetry,
   isDailyPick,
@@ -213,9 +214,9 @@ const DailyHadith = ({
                   <div className="flex justify-between items-baseline">
                     <span className="text-[#8C857B] text-xs">ترتيبه في المكتبة:</span>
                     <span className="font-bold text-[#1E3E30]">
-                      {loading || !hadith
+                     {loading || !hadith
                         ? '...'
-                        : `${arNum(hadith.sortOrder)} من ${arNum(total)}`}
+                         : `${arNum(displayIndex)} من ${arNum(total)}`}
                     </span>
                   </div>
                 </div>
