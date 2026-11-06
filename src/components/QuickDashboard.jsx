@@ -20,7 +20,6 @@ import { arNum } from "../features/Quran/utils";
 
 import { fetchRandomHadith } from "../api/hadithApi";
 
-const API_URL = "https://zawawy-api-staging.onrender.com";
 
 const QUICK_LINKS = [
   {

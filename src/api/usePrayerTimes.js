@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -9,6 +8,10 @@ import {
   loadSavedPlace,
   placeKeyOf,
 } from "../components/prayer/prayerUtils";
+
+// Every prayer time on the site is for Alexandria. country=EG makes the API use the Egyptian
+// General Authority of Survey method.
+export const LOCATION = { latitude: 31.2, longitude: 29.92, country: "EG" };
 
 const pad = (n) => String(n).padStart(2, "0");
 
@@ -71,9 +74,7 @@ export function usePrayerTimes() {
     const months = neededMonths(todayKey);
 
     Promise.all(
-      months.map((month) =>
-        fetchMonth(place, month, controller.signal)
-      )
+      months.map((month) => fetchMonth(place, month, controller.signal))
     )
       .then((responses) => {
         if (controller.signal.aborted) return;
@@ -92,13 +93,7 @@ export function usePrayerTimes() {
       });
 
     return () => controller.abort();
-  }, [
-    place?.id,
-    place?.lat,
-    place?.lng,
-    place?.country,
-    place?.tz,
-  ]);
+  }, [place?.id, place?.lat, place?.lng, place?.country, place?.tz]);
 
   return useMemo(() => {
     if (!days || !place) return null;
@@ -141,8 +136,8 @@ export function usePrayerTimes() {
       const date = new Date(`${todayKey}T12:00:00Z`);
       date.setUTCDate(date.getUTCDate() + offset);
 
-      const key = date.toISOString().slice(0, 10);
-      const record = byDate.get(key);
+      const dayKey = date.toISOString().slice(0, 10);
+      const record = byDate.get(dayKey);
 
       if (!record) return;
 

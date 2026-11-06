@@ -37,7 +37,6 @@ import {
   getDailyReminders,
   getHadiths,
   getRecitations,
-  getImsakiahPdfUrl,
   downloadKhatmPlanPdf,
   toArabicNumerals
 } from '../../services/ramadanService';
@@ -208,23 +207,9 @@ const RamadanPage = () => {
     window.print();
   };
 
-  // 2. Download Colored PDF: Check backend URL or generate printable colored PDF view
-  const handleDownloadPdf = async () => {
-    try {
-      setDownloadingPdf(true);
-      const backendPdfUrl = await getImsakiahPdfUrl(playlist?.year || 2026);
-      if (backendPdfUrl) {
-        window.open(backendPdfUrl, '_blank');
-        setDownloadingPdf(false);
-        return;
-      }
-    } catch (err) {
-      console.warn('Backend PDF check failed, falling back to dynamic printable view:', err);
-    } finally {
-      setDownloadingPdf(false);
-    }
-
-    // Dynamic Colored PDF Print View Fallback
+  // 2. Download Colored PDF: opens the printable colored view right away. It must run inside the
+  // click itself; after an await, browsers treat window.open as a pop-up and block it.
+  const handleDownloadPdf = () => {
     generateColoredImsakiahPdfView();
   };
 
@@ -332,9 +317,9 @@ const RamadanPage = () => {
       <body>
         <div class="header">
           <h1 class="title">إمساكية شهر رمضان المبارك ${hijriYear} هـ / ${gregorianYear} م</h1>
-          <p class="subtitle">المواقيت الرسمية المعتمدة لمواقيت الإمساك والصلوات الخمس والإفطار بحسب تقويم أم القرى</p>
+          <p class="subtitle">المواقيت الرسمية المعتمدة لمواقيت الإمساك والصلوات الخمس والإفطار لمدينة الإسكندرية بحسب الهيئة المصرية العامة للمساحة</p>
           <div class="meta-badges">
-            <span class="meta-badge">الموقع: مكة المكرمة (المسجد الحرام)</span>
+            <span class="meta-badge">الموقع: الإسكندرية، مصر</span>
             <span class="meta-badge">فضيلة الشيخ عبدالرحمن الزواوي</span>
           </div>
         </div>
@@ -358,7 +343,7 @@ const RamadanPage = () => {
           </tbody>
         </table>
         <div class="footer">
-          المرجع المعتمد: تقويم أم القرى الرسمي لمكة المكرمة لموسم ${hijriYear} هـ — منصة فضيلة الشيخ عبدالرحمن الزواوي
+          المرجع المعتمد: الهيئة المصرية العامة للمساحة — مواقيت الإسكندرية لموسم ${hijriYear} هـ — منصة فضيلة الشيخ عبدالرحمن الزواوي
         </div>
         <script>
           window.onload = function() {
@@ -443,7 +428,7 @@ const RamadanPage = () => {
 
                 <div className="w-full bg-white/15 backdrop-blur-md text-gray-200 px-5 py-2.5 rounded-2xl border border-white/20 text-xs flex items-center justify-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>أرشيف رسمي موثق بحسب تقويم أم القرى لمكة المكرمة</span>
+                  <span>مواقيت الإسكندرية بحسب الهيئة المصرية العامة للمساحة</span>
                 </div>
               </div>
             </div>
@@ -499,13 +484,13 @@ const RamadanPage = () => {
                 <div className="bg-[#e9f3ee] border border-emerald-100 text-emerald-900 text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 font-medium">
                   <Calendar className="w-3.5 h-3.5 text-emerald-700" />
                   <span>
-                    المرجع: {activeDayData?.day || 'السبت'} {activeDayData?.ramadan || `٠٤ رمضان`} {hijriYear} هـ ({activeDayData?.gregorian || '٢١ مارس ٢٠٢٦'})
+                    المرجع: {activeDayData?.day || '—'} {activeDayData?.ramadan || '—'} {hijriYear} هـ ({activeDayData?.gregorian || '—'})
                   </span>
                 </div>
                 
                 <div className="bg-[#134e3b] text-white text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-2 shadow-sm">
                   <MapPin className="w-4 h-4 text-[#e2d595]" />
-                  <span>مكة المكرمة (توقيت أم القرى الرسمي)</span>
+                  <span>الإسكندرية (الهيئة المصرية العامة للمساحة)</span>
                 </div>
               </div>
             </div>
@@ -537,12 +522,12 @@ const RamadanPage = () => {
 
                     <div className="my-2 text-right">
                       <div className="text-4xl md:text-5xl font-black text-emerald-950 tracking-tight flex items-baseline gap-2">
-                        <span>{activeDayData?.imsak || '٠٥:٢١ ص'}</span>
+                        <span>{activeDayData?.imsak || '—'}</span>
                       </div>
                     </div>
 
                     <p className="text-xs text-emerald-800/80 text-right mt-4 pt-3 border-t border-emerald-100/80">
-                      يبدأ الإمساك عند {activeDayData?.imsak || '٠٥:٢١ ص'}، وأذان الفجر عند {activeDayData?.fajr || '٠٥:٣١ ص'} حسب تقويم أم القرى.
+                      يبدأ الإمساك عند {activeDayData?.imsak || '—'}، وأذان الفجر عند {activeDayData?.fajr || '—'} بتوقيت الإسكندرية.
                     </p>
                   </div>
 
@@ -565,12 +550,12 @@ const RamadanPage = () => {
 
                     <div className="my-2 text-right">
                       <div className="text-4xl md:text-5xl font-black text-amber-950 tracking-tight flex items-baseline gap-2">
-                        <span>{activeDayData?.maghrib || '٠٦:٢١ م'}</span>
+                        <span>{activeDayData?.maghrib || '—'}</span>
                       </div>
                     </div>
 
                     <p className="text-xs text-amber-800/80 text-right mt-4 pt-3 border-t border-amber-200/60">
-                      غروب قرص الشمس المؤذن بدخول وقت الإفطار وصلاة المغرب بمكة المكرمة.
+                      غروب قرص الشمس المؤذن بدخول وقت الإفطار وصلاة المغرب بالإسكندرية.
                     </p>
                   </div>
                 </div>
@@ -580,28 +565,28 @@ const RamadanPage = () => {
                   <div className="bg-[#f3f7f5] rounded-xl p-3.5 text-center border border-gray-100">
                     <span className="text-xs text-gray-500 font-medium block mb-1">أذان الفجر</span>
                     <div className="text-lg font-bold text-emerald-950">
-                      <span>{activeDayData?.fajr || '٠٥:٣١ ص'}</span>
+                      <span>{activeDayData?.fajr || '—'}</span>
                     </div>
                   </div>
 
                   <div className="bg-[#f3f7f5] rounded-xl p-3.5 text-center border border-gray-100">
                     <span className="text-xs text-gray-500 font-medium block mb-1">الشروق</span>
                     <div className="text-lg font-bold text-emerald-950">
-                      <span>{activeDayData?.shuruq || '٠٦:٤٧ ص'}</span>
+                      <span>{activeDayData?.shuruq || '—'}</span>
                     </div>
                   </div>
 
                   <div className="bg-[#f3f7f5] rounded-xl p-3.5 text-center border border-gray-100">
                     <span className="text-xs text-gray-500 font-medium block mb-1">الظهر</span>
                     <div className="text-lg font-bold text-emerald-950">
-                      <span>{activeDayData?.dhuhr || '١٢:٣٤ م'}</span>
+                      <span>{activeDayData?.dhuhr || '—'}</span>
                     </div>
                   </div>
 
                   <div className="bg-[#f3f7f5] rounded-xl p-3.5 text-center border border-gray-100">
                     <span className="text-xs text-gray-500 font-medium block mb-1">العصر</span>
                     <div className="text-lg font-bold text-emerald-950">
-                      <span>{activeDayData?.asr || '٠٣:٥٣ م'}</span>
+                      <span>{activeDayData?.asr || '—'}</span>
                     </div>
                   </div>
                 </div>
@@ -953,7 +938,7 @@ const RamadanPage = () => {
                   إمساكية شهر رمضان المبارك {hijriYear} هـ / {gregorianYear} م
                 </h2>
                 <p className="text-xs md:text-sm text-gray-500 font-light">
-                  الجدول الرسمي المعتمد لمواقيت الإمساك والصلوات الخمس والإفطار بحسب تقويم أم القرى لمكة المكرمة لموسم {hijriYear} هـ
+                  الجدول الرسمي المعتمد لمواقيت الإمساك والصلوات الخمس والإفطار لمدينة الإسكندرية بحسب الهيئة المصرية العامة للمساحة لموسم {hijriYear} هـ
                 </p>
               </div>
 
@@ -962,6 +947,7 @@ const RamadanPage = () => {
                 <button 
                   type="button"
                   onClick={handlePrint}
+                  disabled={!imsakiahData.length}
                   className="bg-[#eef5f1] hover:bg-[#e2ede7] text-[#0b3b2c] text-xs md:text-sm font-semibold px-5 py-2.5 rounded-2xl flex items-center gap-2 border border-emerald-100 transition-colors cursor-pointer"
                   title="طباعة جدول الإمساكية المعتمد"
                 >
@@ -972,7 +958,7 @@ const RamadanPage = () => {
                 <button 
                   type="button"
                   onClick={handleDownloadPdf}
-                  disabled={downloadingPdf}
+                  disabled={downloadingPdf || !imsakiahData.length}
                   className="bg-[#103e2e] hover:bg-[#0a2c20] text-white text-xs md:text-sm font-semibold px-5 py-2.5 rounded-2xl flex items-center gap-2 shadow-sm transition-colors cursor-pointer disabled:opacity-60"
                   title="تحميل نسخة PDF ملونة عالية الجودة"
                 >
@@ -1004,6 +990,13 @@ const RamadanPage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-gray-700">
+                  {!loading && !imsakiahData.length && (
+                    <tr>
+                      <td colSpan={10} className="py-8 px-4 text-center text-gray-500">
+                        تعذر تحميل مواقيت الإمساكية الآن. أعد تحميل الصفحة للمحاولة مرة أخرى.
+                      </td>
+                    </tr>
+                  )}
                   {imsakiahData.map((row) => {
                     const isSelected = row.dayNumber === selectedDayNumber;
                     return (
@@ -1036,7 +1029,7 @@ const RamadanPage = () => {
 
             {/* Table Footer Subtext */}
             <p className="text-[11px] md:text-xs text-gray-500 text-right font-light">
-              <span className="font-semibold text-gray-700">الرسمي المعتمد:</span> التوقيتات الدقيقة بحسب أفق المسجد الحرام بمكة المكرمة لحساب صيام شهر رمضان المبارك {hijriYear} هـ. وتخضع البداية والنهاية لما تقره المحكمة العليا بثبوت الرؤية.
+              <span className="font-semibold text-gray-700">الرسمي المعتمد:</span> التوقيتات بحسب أفق مدينة الإسكندرية لحساب صيام شهر رمضان المبارك {hijriYear} هـ. وتخضع البداية والنهاية لما تعلنه دار الإفتاء المصرية بثبوت الرؤية.
             </p>
           </section>
 

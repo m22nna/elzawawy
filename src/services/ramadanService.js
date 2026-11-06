@@ -3,6 +3,8 @@
  * Connects with Zawawy API staging for Ramadan playlists, daily content, prayer/imsakiah schedules, and supplications.
  */
 
+import { LOCATION } from '../api/usePrayerTimes';
+
 const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || 'https://zawawy-api-staging.onrender.com').replace(/\/+$/, '');
 
 /**
@@ -143,14 +145,14 @@ const ARABIC_GREGORIAN_MONTHS = [
 
 /**
  * Fetch Ramadan Imsakiah (Prayer schedule for 30 days of Ramadan)
- * Uses Umm Al-Qura methodology (Makkah coordinates)
+ * Alexandria, Egyptian General Authority of Survey (same location as the rest of the site)
  */
 export async function getRamadanImsakiah(year = 2026) {
   try {
     // Ramadan 1447 AH spans February and March 2026
     const [febRes, marRes] = await Promise.all([
-      requestApi('/v1/prayer-times?latitude=21.4225&longitude=39.8262&month=2026-02&country=SA'),
-      requestApi('/v1/prayer-times?latitude=21.4225&longitude=39.8262&month=2026-03&country=SA')
+      requestApi(`/v1/prayer-times?${new URLSearchParams({ ...LOCATION, month: '2026-02' })}`),
+      requestApi(`/v1/prayer-times?${new URLSearchParams({ ...LOCATION, month: '2026-03' })}`)
     ]);
 
     const allDays = [...(febRes?.days || []), ...(marRes?.days || [])];
@@ -186,28 +188,12 @@ export async function getRamadanImsakiah(year = 2026) {
       });
     }
   } catch (err) {
-    console.error('Failed to fetch Ramadan prayer times from API, using curated schedule:', err);
+    console.error('Failed to fetch Ramadan prayer times:', err);
   }
 
-  // Curated Fallback Imsakiah for Ramadan 1447 H / 2026 M
-  return Array.from({ length: 30 }, (_, i) => {
-    const num = i + 1;
-    return {
-      dayNumber: num,
-      day: ARABIC_WEEKDAYS[(i + 3) % 7], // starts Wednesday
-      ramadan: `${toArabicNumerals(String(num).padStart(2, '0'))} رمضان`,
-      gregorian: `${toArabicNumerals(17 + num > 31 ? (17 + num) - 31 : 17 + num)} ${17 + num > 31 ? 'أبريل' : 'مارس'} ${toArabicNumerals(2026)}`,
-      rawDate: `2026-03-${17 + num}`,
-      imsak: toArabicNumerals(`04:${Math.max(30, 54 - i)} ص`),
-      fajr: toArabicNumerals(`05:${Math.max(40, 4 - Math.floor(i / 3))} ص`),
-      shuruq: toArabicNumerals(`06:${Math.max(0, 21 - Math.floor(i / 2))} ص`),
-      dhuhr: toArabicNumerals('12:28 م'),
-      asr: toArabicNumerals('03:51 م'),
-      maghrib: toArabicNumerals(`06:${33 + Math.floor(i / 2)} م`),
-      isha: toArabicNumerals(`08:${3 + Math.floor(i / 2)} م`),
-      isCurrent: num === 4,
-    };
-  });
+  // No times from the API: return nothing rather than invent a timetable. The page says the
+  // times could not be loaded; showing made-up fasting times would be worse than showing none.
+  return [];
 }
 
 /**
@@ -260,23 +246,6 @@ export function getRamadanGuides() {
       image: 'https://images.unsplash.com/photo-1564769625905-50e93615e769?auto=format&fit=crop&q=80&w=600'
     }
   ];
-}
-
-/**
- * Check if the backend provides a direct Imsakiah PDF download link
- * @param {number|string} year - e.g. 2026
- * @returns {Promise<string|null>}
- */
-export async function getImsakiahPdfUrl(year = 2026) {
-  try {
-    const res = await requestApi(`/v1/ramadan/imsakiah/pdf?year=${year}`);
-    if (res && res.pdfUrl) {
-      return res.pdfUrl;
-    }
-  } catch {
-    // Backend has no direct PDF endpoint yet
-  }
-  return null;
 }
 
 /**
