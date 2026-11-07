@@ -168,21 +168,24 @@ const audioTrack = nightItems.find(item => item.url) || {
   };
 
   // Card 2: Open Scientific Series & Fasting Hadiths Modal
-  const handleOpenHadithsSeries = async () => {
+const handleOpenHadithsSeries = async () => {
     setHadithModalOpen(true);
-    if (hadithsList.length === 0) {
-      setHadithsLoading(true);
-      try {
-        const data = await getHadiths();
-        setHadithsList(data.length > 0 ? data : dailyReminders);
-      } catch (e) {
+    setHadithsLoading(true);
+    try {
+        const response = await fetch('https://zawawy-api-staging.onrender.com/v1/hadiths');
+        const data = await response.json();
+        
+        // فلترة الأحاديث لتقتصر على أحاديث الصيام (مثلاً بالبحث في النص أو المصدر)
+        const fastingHadiths = data.filter(h => h.source && h.source.includes('الصيام'));
+        
+        setHadithsList(fastingHadiths.length > 0 ? fastingHadiths : data);
+    } catch (e) {
         console.error(e);
-        setHadithsList(dailyReminders);
-      } finally {
+        setHadithsList([]);
+    } finally {
         setHadithsLoading(false);
-      }
     }
-  };
+};
 
   // Card 3: Download / Print Balanced Khatm Plan PDF
   const handleDownloadKhatmPlan = () => {
