@@ -66,12 +66,11 @@ function Page() {
         {items.length > 0 && shown.length === 0 ? (
           <div className="mt-10 rounded-2xl border border-[#E6EFE9] bg-white px-6 py-12 text-center shadow-sm">
             <p className="text-base font-bold text-pine">
-              مفيش نتائج مطابقة لبحثك
+لا توجد نتائج مطابقة لبحثك
             </p>
 
             <p className="mt-2 text-sm text-muted">
-              جرّب تبحث بكلمة تانية .
-            </p>
+حاول البحث باستخدام كلمة أخرى          </p>
           </div>
         ) : (
           <DownloadsList

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../../components/NavBar';
 import AyahNumber from '../../components/AyahNumber';
 
@@ -520,10 +520,12 @@ const handleSearch = async () => {
         {/* Breadcrumb Navigation */}
         <nav className="max-w-7xl mx-auto mb-6 flex items-center justify-between text-xs md:text-sm text-gray-600">
           <div className="flex items-center gap-2 bg-[#e9f0ec] px-4 py-1.5 rounded-full text-gray-700 font-medium">
-            <span className="flex items-center gap-1 font-semibold text-gray-800">
+            <Link 
+              to="/"
+            className="flex items-center gap-1 font-semibold text-gray-800">
               <Home className="w-3.5 h-3.5 text-emerald-800" />
               الرئيسية
-            </span>
+            </Link>
 
             <ChevronLeft className="w-3.5 h-3.5 text-gray-400" />
 

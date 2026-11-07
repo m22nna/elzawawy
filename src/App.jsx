@@ -6,6 +6,7 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
+import Footer from "./components/Footer";
 
 import { lazy, Suspense, useEffect } from "react";
 
@@ -112,6 +113,7 @@ export default function App() {
         <HashRedirect />
 
         <div className="min-h-screen flex flex-col pb-36 md:pb-40">
+          <main className="flex-1">
           <Suspense fallback={<Loading />}>
             <Routes>
               <Route path="/" element={<HomePage />} />
@@ -134,6 +136,9 @@ export default function App() {
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
+          </main>
+
+          <Footer />
         </div>
 
         <AudioPlayer />

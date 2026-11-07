@@ -8,6 +8,7 @@ import {
   arDigits,
   compassName,
   fmt12,
+  isValidTz,
   monthLabel,
   placeKeyOf,
   shiftMonth
@@ -79,28 +80,133 @@ function Modal({ title, onClose, wide = false, children }) {
 /* ================= اختيار المدينة ================= */
 export function PlaceModal({ current, onSelect, onClose }) {
   const [q, setQ] = useState('');
-  const [geo, setGeo] = useState('idle'); // idle | loading | denied | unsupported
+  const [geo, setGeo] = useState('idle');
+  const [remotePlaces, setRemotePlaces] = useState([]);
+  const [searchStatus, setSearchStatus] = useState('idle');
 
-  const term = normalizeCityName(q);
+  const term = q.trim();
 
-const list = PLACES.filter((p) => {
-  const searchableText = normalizeCityName(
-    `${p.name} ${p.countryName} ${p.nameEnglish || ''} ${p.id}`
-  );
+  // البحث في المدن المحلية كحل احتياطي
+  const localList = PLACES.filter((p) => {
+    const searchableText = normalizeCityName(
+      `${p.name} ${p.countryName} ${p.nameEnglish || ''} ${p.id}`
+    );
 
-  return !term || searchableText.includes(term);
+    return !term || searchableText.includes(normalizeCityName(term));
+  });
+
+  // لو فيه نتائج من الـ API نعرضها، وإلا نعرض المدن المحلية
+  const list =
+    term.length >= 2 && remotePlaces.length > 0
+      ? remotePlaces
+      : localList;
+
+  // البحث عن المدن من خلال Open-Meteo
+  useEffect(() => {
+    if (term.length < 2) {
+      setRemotePlaces([]);
+      setSearchStatus('idle');
+      return;
+    }
+
+    const controller = new AbortController();
+
+    setRemotePlaces([]);
+    setSearchStatus('loading');
+
+    const timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({
+          name: term,
+          count: '15',
+          language: 'ar',
+          format: 'json'
+        });
+
+        const res = await fetch(
+          `https://geocoding-api.open-meteo.com/v1/search?${params}`,
+          { signal: controller.signal }
+        );
+
+        if (!res.ok) {
+          throw new Error(`Geocoding API error: ${res.status}`);
+        }
+
+        const data = await res.json();
+
+        const results = (data.results || [])
+  .filter((item) => {
+    return (
+      Number.isFinite(item.latitude) &&
+      Number.isFinite(item.longitude) &&
+      isValidTz(item.timezone)
+    );
+  });
+
+// ترتيب النتائج: الاسم المطابق أولًا، وبعده المدن الأكبر
+results.sort((a, b) => {
+  const aExact = normalizeCityName(a.name) === normalizeCityName(term);
+  const bExact = normalizeCityName(b.name) === normalizeCityName(term);
+
+  if (aExact !== bExact) return aExact ? -1 : 1;
+
+  return (b.population || 0) - (a.population || 0);
 });
 
+// إزالة النتائج المكررة حسب الإحداثيات
+const seen = new Set();
+
+const places = results
+  .filter((item) => {
+    const key = `${item.latitude},${item.longitude}`;
+
+    if (seen.has(key)) return false;
+
+    seen.add(key);
+    return true;
+  })
+  .map((item) => ({
+    id: `geo-${item.id}`,
+    name: item.name,
+    nameEnglish: item.name,
+    region: item.admin1 || item.admin2 || '',
+    countryName: item.country || '',
+    country: item.country_code || '',
+    lat: String(item.latitude),
+    lng: String(item.longitude),
+    tz: item.timezone
+  }));
+
+setRemotePlaces(places);
+        setSearchStatus('done');
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.error('City search failed:', error);
+          setSearchStatus('error');
+        }
+      }
+    }, 400);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [term]);
 
   const useMyLocation = () => {
     if (!navigator.geolocation) {
       setGeo('unsupported');
       return;
     }
+
     setGeo('loading');
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Cairo';
+        const tz =
+          Intl.DateTimeFormat().resolvedOptions().timeZone ||
+          'Africa/Cairo';
+
         onSelect({
           id: 'mine',
           name: 'موقعي الحالي',
@@ -127,17 +233,29 @@ const list = PLACES.filter((p) => {
           style={{ backgroundColor: GREEN }}
         >
           <LocateFixed size={16} />
-          {geo === 'loading' ? 'جاري تحديد موقعك...' : 'استخدام موقعي الحالي'}
+          {geo === 'loading'
+            ? 'جاري تحديد موقعك...'
+            : 'استخدام موقعي الحالي'}
         </button>
+
         {geo === 'denied' && (
-          <p className="text-center text-[11px] text-red-600">لم يتم السماح بتحديد الموقع، اختر مدينتك من القائمة.</p>
-        )}
-        {geo === 'unsupported' && (
-          <p className="text-center text-[11px] text-red-600">المتصفح لا يدعم تحديد الموقع، اختر مدينتك من القائمة.</p>
+          <p className="text-center text-[11px] text-red-600">
+            لم يتم السماح بتحديد الموقع، اختر مدينتك من القائمة.
+          </p>
         )}
 
-        <label className="flex items-center gap-2 rounded-xl border bg-[#faf8f2] px-3 py-2.5" style={{ borderColor: BORDER }}>
+        {geo === 'unsupported' && (
+          <p className="text-center text-[11px] text-red-600">
+            المتصفح لا يدعم تحديد الموقع، اختر مدينتك من القائمة.
+          </p>
+        )}
+
+        <label
+          className="flex items-center gap-2 rounded-xl border bg-[#faf8f2] px-3 py-2.5"
+          style={{ borderColor: BORDER }}
+        >
           <Search size={14} className="text-slate-400" />
+
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -147,30 +265,57 @@ const list = PLACES.filter((p) => {
           />
         </label>
 
+        {searchStatus === 'error' && (
+          <p className="text-center text-[11px] text-amber-600">
+            تعذّر البحث عن المدن، يمكنك الاختيار من المدن المتاحة.
+          </p>
+        )}
+
         <ul className="space-y-1.5">
+          {searchStatus === 'loading' && (
+            <li className="py-3 text-center text-[11px] text-slate-500">
+              جاري البحث عن المدن...
+            </li>
+          )}
+
           {list.map((p) => {
             const active = placeKeyOf(p) === placeKeyOf(current);
+
             return (
               <li key={p.id}>
                 <button
                   type="button"
                   onClick={() => onSelect(p)}
                   className={`flex w-full cursor-pointer items-center justify-between rounded-xl border px-4 py-3 text-right transition ${
-                    active ? 'bg-[#e2ece9]' : 'bg-white hover:bg-[#f7f6f1]'
+                    active
+                      ? 'bg-[#e2ece9]'
+                      : 'bg-white hover:bg-[#f7f6f1]'
                   }`}
                   style={{ borderColor: active ? GREEN : BORDER }}
                 >
                   <span className="flex items-center gap-2.5">
                     <MapPin size={14} style={{ color: GOLD }} />
-                    <span className="text-[13px] font-bold text-[#0f172a]">{p.name}</span>
-                    <span className="text-[10px] text-slate-500">{p.countryName}</span>
+
+                    <span className="text-[13px] font-bold text-[#0f172a]">
+                      {p.name}
+                    </span>
+
+                    <span className="text-[10px] text-slate-500">
+                           {[p.region, p.countryName].filter(Boolean).join('، ')}
+                    </span>
                   </span>
+
                   {active && <Check size={15} style={{ color: GREEN }} />}
                 </button>
               </li>
             );
           })}
-          {list.length === 0 && <li className="py-6 text-center text-[12px] text-slate-500">لا توجد مدينة بهذا الاسم</li>}
+
+          {list.length === 0 && searchStatus !== 'loading' && (
+            <li className="py-6 text-center text-[12px] text-slate-500">
+              لا توجد مدينة بهذا الاسم
+            </li>
+          )}
         </ul>
       </div>
     </Modal>

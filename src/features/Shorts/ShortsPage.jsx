@@ -205,15 +205,6 @@ const share = useCallback(async (s) => {
   </div>
 )}
 
-      <footer className="mt-14 flex flex-wrap items-center justify-between gap-2 border-t border-[#D3E5DB] pt-5 text-[10px] text-muted">
-        <span className="flex items-center gap-2 font-bold text-pine">
-          <span className="grid h-6 w-6 place-items-center rounded-md bg-pine text-white">
-            <BookOpen size={12} />
-          </span>
-          المنصة الرسمية للشيخ عبدالرحمن الزواوي
-        </span>
-        <span>جميع الحقوق محفوظة للمحتوى القرآني والنبوي الشريف © ١٤٤٨ هـ</span>
-      </footer>
     </>
   );
 }

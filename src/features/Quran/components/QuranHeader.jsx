@@ -313,7 +313,7 @@ export default function QuranHeader({ surahs }) {
       </ul>
     ) : (
       <p className="px-5 py-4 text-center text-sm text-muted">
-        مفيش نتائج مطابقة لبحثك
+لا توجد نتائج مطابقة لبحثك
       </p>
     )}
   </div>
