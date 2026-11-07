@@ -43,13 +43,13 @@ function SurahCard({ surah, current }) {
             onClick={() => player.toggle(surah.id)}
             disabled={!player.hasTrack?.(surah.id)}
             aria-label={playing ? "إيقاف التلاوة" : "تشغيل التلاوة"}
-            className="grid h-8 w-8 place-items-center rounded-full border border-[#E6EFE9] text-pine disabled:opacity-40"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#E6EFE9] text-pine disabled:opacity-40"
           >
             {playing ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
           </button>
           <Link
             to={`/quran/page/${firstPageOfSurah(surah.id)}`}
-            className={`rounded-lg px-4 py-1.5 text-[11px] font-bold ${current ? "bg-pine text-white" : "border border-[#E6EFE9] bg-white text-pine hover:bg-[#F2F7F4]"}`}
+            className={`inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-1.5 text-[11px] font-bold ${current ? "bg-pine text-white" : "border border-[#E6EFE9] bg-white text-pine hover:bg-[#F2F7F4]"}`}
           >
             قراءة
           </Link>
@@ -76,7 +76,7 @@ function JuzCard({ juz, current }) {
       </div>
       <Link
         to={`/quran/page/${page}`}
-        className={`rounded-lg px-4 py-1.5 text-[11px] font-bold ${current ? "bg-pine text-white" : "border border-[#E6EFE9] bg-white text-pine hover:bg-[#F2F7F4]"}`}
+        className={`inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-1.5 text-[11px] font-bold ${current ? "bg-pine text-white" : "border border-[#E6EFE9] bg-white text-pine hover:bg-[#F2F7F4]"}`}
       >
         قراءة
       </Link>
@@ -120,7 +120,7 @@ export default function SurahIndex({ surahs, currentId, currentPage }) {
               key={key}
               type="button"
               onClick={() => setFilter(key)}
-              className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-[11px] font-bold transition ${filter === key ? "bg-pine text-white" : "bg-white text-pine hover:bg-[#E6EFE9]"}`}
+              className={`flex min-h-11 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-[11px] font-bold transition ${filter === key ? "bg-pine text-white" : "bg-white text-pine hover:bg-[#E6EFE9]"}`}
             >
               {key === "juz" && <LayoutGrid size={12} />}
               {label}
@@ -154,7 +154,7 @@ export default function SurahIndex({ surahs, currentId, currentPage }) {
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="inline-flex items-center gap-2 rounded-full border border-[#E6EFE9] bg-white px-6 py-2.5 text-xs font-bold text-pine hover:bg-[#F2F7F4]"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[#E6EFE9] bg-white px-6 py-2.5 text-xs font-bold text-pine hover:bg-[#F2F7F4]"
           >
             {expanded ? "عرض أقل" : "عرض المزيد من السور (باقي المصحف الشريف)"}
             <ChevronDown size={14} className={expanded ? "rotate-180" : ""} />

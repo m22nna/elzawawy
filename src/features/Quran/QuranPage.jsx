@@ -36,16 +36,7 @@ function Content({ page, surahs, data, onActive }) {
       <ReaderCard page={page} surahs={surahs} {...data} onRetry={data.retry} onActive={onActive} />
 
       <SurahIndex surahs={surahs} currentId={primaryId} currentPage={page} />
-
-      <footer className="mt-12 flex flex-wrap items-center justify-between gap-2 border-t border-[#E6EFE9] pt-5 text-[10px] text-muted">
-        <span className="flex items-center gap-2 font-bold text-pine">
-          <span className="grid h-6 w-6 place-items-center rounded-md bg-pine text-white">
-            <BookOpen size={12} />
-          </span>
-          المنصة الرسمية للشيخ عبدالرحمن الزواوي
-        </span>
-        <span>جميع الحقوق محفوظة للمحتوى القرآني والنبوي الشريف © ١٤٤٨ هـ</span>
-      </footer>
+      
     </>
   );
 }

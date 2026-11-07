@@ -190,19 +190,21 @@ export function getTafsirSources() {
 /**
  * Normalize Arabic text
  */
+
 export const normalizeArabic = (text) => {
   if (!text) return '';
 
   return String(text)
     .normalize('NFKC')
-    // Preserve Uthmani small letters as their corresponding letters
-    .replace(/\u0670/g, 'ا') // Superscript Alef
-    .replace(/\u06E5/g, 'و') // Small Waw
-    .replace(/\u06E6/g, 'ي') // Small Yeh
-    // Remove tashkeel and Quranic annotation marks
+    .replace(/\u0670/g, 'ا')
+    .replace(/\u06E5/g, 'و')
+    .replace(/\u06E6/g, 'ي')
     .replace(/[\u064B-\u065F\u06D6-\u06ED]/g, '')
     .replace(/[إأآٱ]/g, 'ا')
     .replace(/ة/g, 'ه')
+    // Handle Uthmani Quran spelling
+    .replace(/صلواه|صلوه/g, 'صلاه')
+    .replace(/زكواه|زكوه/g, 'زكاه')
     .replace(/ى/g, 'ي')
     .replace(/[ؤئ]/g, '')
     .replace(/[۞۩ـ]/g, '')
@@ -211,6 +213,7 @@ export const normalizeArabic = (text) => {
     .trim()
     .toLowerCase();
 };
+
 /**
  * Search across all Quran Surahs and Ayahs
  */

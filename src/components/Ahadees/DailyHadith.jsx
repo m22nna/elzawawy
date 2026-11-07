@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Share2, Bookmark, BookOpen, Check, Sparkles } from 'lucide-react';
+import { Search, Share2, Bookmark, BookOpen, Check, Sparkles,ChevronLeft } from 'lucide-react';
 import { arNum } from '../../features/Quran/utils';
 
 const DailyHadith = ({
@@ -46,7 +46,7 @@ const DailyHadith = ({
         <header className="border-b border-[#EDE9E1] pb-5" dir="rtl">
           <nav className="flex items-center gap-2 text-[11px] text-[#8C857B] mb-3 font-medium">
             <Link to="/" className="hover:text-[#1E3E30]">الرئيسية</Link>
-            <span>/</span>
+            <span><ChevronLeft size={10} className="text-muted" /></span>
             <span className="text-[#1E3E30] font-bold">الأحاديث النبوية</span>
           </nav>
 

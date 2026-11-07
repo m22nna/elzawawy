@@ -46,7 +46,7 @@ const readSize = () => {
 };
 
 const toolBtn =
-  "grid h-9 min-w-9 place-items-center rounded-lg border border-[#E6EFE9] bg-white px-2 text-xs font-bold text-pine transition hover:bg-[#F2F7F4]";
+  "grid h-11 min-w-11 place-items-center rounded-lg border border-[#E6EFE9] bg-white px-2 text-xs font-bold text-pine transition hover:bg-[#F2F7F4]";
 
 function groupBySurah(ayahs) {
   const groups = [];
@@ -118,7 +118,7 @@ function PageJump({ page, onGo }) {
         setEditing(true);
       }}
       title="اذهب إلى صفحة"
-      className="rounded-full bg-[#F2F7F4] px-4 py-1.5 text-xs font-bold text-pine hover:bg-[#E6EFE9]"
+      className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#F2F7F4] px-4 py-1.5 text-xs font-bold text-pine hover:bg-[#E6EFE9]"
     >
       الصفحة {arNum(page)} • الحزب {arNum(hizbOfPage(page))}
     </button>
@@ -353,7 +353,7 @@ export default function ReaderCard({
               !activeSurah ||
               !player.hasTrack?.(activeSurah.id)
             }
-            className="flex items-center gap-2 rounded-lg bg-pine px-4 py-2.5 text-xs font-bold text-white disabled:opacity-40"
+            className="flex min-h-11 items-center gap-2 rounded-lg bg-pine px-4 py-2.5 text-xs font-bold text-white disabled:opacity-40"
           >
             {playing ? (
               <Pause size={13} fill="currentColor" />
@@ -442,7 +442,7 @@ export default function ReaderCard({
               <button
                 type="button"
                 onClick={onRetry}
-                className="mt-4 rounded-lg bg-pine px-5 py-2 text-xs font-bold text-white"
+                className="mt-4 min-h-11 rounded-lg bg-pine px-5 py-2 text-xs font-bold text-white"
               >
                 إعادة المحاولة
               </button>
@@ -564,7 +564,7 @@ export default function ReaderCard({
         {page > 1 ? (
           <Link
             to={`/quran/page/${page - 1}`}
-            className="flex items-center gap-1 font-bold text-pine hover:underline"
+            className="inline-flex min-h-11 items-center gap-1 font-bold text-pine hover:underline"
           >
             <ChevronRight size={14} />
             الصفحة السابقة
@@ -581,7 +581,7 @@ export default function ReaderCard({
         {page < TOTAL_PAGES ? (
           <Link
             to={`/quran/page/${page + 1}`}
-            className="flex items-center gap-1 font-bold text-pine hover:underline"
+            className="inline-flex min-h-11 items-center gap-1 font-bold text-pine hover:underline"
           >
             الصفحة التالية
             <ChevronLeft size={14} />
